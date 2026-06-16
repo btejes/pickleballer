@@ -1,21 +1,5 @@
-// All 31 questions in the BePickleballer paddle finder quiz.
-// Questions are hard-coded in V0. Categories per answer are configured by Ben
-// through the Quiz Mapping admin screen.
-//
-// DUPR ranges (Q5) and budget brackets (Q31) live ONLY in the Apps Script
-// backend (FILTER_ANSWERS). Do NOT add duprMin/duprMax/budgetMax here.
-//
-// Question types:
-//   "single"   - single-choice radio buttons
-//   "multi"    - multi-select checkboxes (Q30 only)
-//   "slider"   - 1-10 numeric slider (Q7, Q13-Q17)
-//   "search"   - paddle name autocomplete with fallback radio options (Q1 only)
-//
-// Special flags:
-//   filter: true  - this answer drives a hard filter (Q5 DUPR, Q31 budget)
-//
-// Each answer has a stable id so it can be referenced by the Quiz Mapping table
-// without breaking if wording changes.
+// Quiz questions. Category mapping per answer is set in the admin.
+// DUPR ranges and budget brackets live in the Apps Script (FILTER_ANSWERS).
 
 window.BP_QUESTIONS = [
   {

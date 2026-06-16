@@ -1,20 +1,5 @@
-// === PADDLE QUIZ V0 - Milestone 2: Quiz Engine Backend ===
-// Add this to the existing BePickleballer Email Capture Apps Script project
-// (alongside PaddleQuiz.gs from M1).
-//
-// After pasting, run setupQuizSheets() once from the editor, then redeploy.
-//
-// Also add these action routes to the switch() inside doPost in Code.gs:
-//   case 'submit_quiz':       return handleSubmitQuiz(data);
-//   case 'get_result':        return handleGetResult(data);
-//   case 'paddle_search':     return handlePaddleSearch(data);
-//   case 'list_mappings':     return handleListMappings(data);
-//   case 'save_mappings':     return handleSaveMappings(data);
+// Quiz engine backend. Run setupQuizSheets() once, then redeploy.
 
-// Public URL where the quiz is hosted. Used in the results email so the user
-// can click back to view / share their results. Set via Script Properties:
-//   File > Project Settings > Script Properties: BP_QUIZ_PUBLIC_URL
-// Example: https://yourname.github.io/bp-quiz/
 function getQuizPublicUrl() {
   var v = PropertiesService.getScriptProperties().getProperty('BP_QUIZ_PUBLIC_URL');
   return (v || '').replace(/\/+$/, '');
@@ -377,11 +362,7 @@ function parseDuprTier(tier) {
   return isNaN(n) ? null : n;
 }
 
-// SOURCE OF TRUTH for DUPR + budget filter ranges.
-// This is the ONLY place the numeric ranges live. The frontend questions.js
-// stores the answer IDs and display labels only - it does not duplicate these
-// ranges. If a range changes, change it ONLY here.
-// Any consumer that needs the ranges can fetch them via the `list_filters` action.
+// DUPR + budget filter ranges. Change ranges here.
 var FILTER_ANSWERS = {
   'q5_beginner': { duprMin: 0, duprMax: 2.9 },
   'q5_30':       { duprMin: 2.8, duprMax: 3.4 },
@@ -401,8 +382,6 @@ function findAnswerInQuestions(qid, aid) {
   return FILTER_ANSWERS[aid] || null;
 }
 
-// Public action: returns the filter ranges so any frontend can fetch them
-// instead of hardcoding (single source of truth).
 function handleListFilters(data) {
   return jsonResponse({ success: true, filters: FILTER_ANSWERS });
 }

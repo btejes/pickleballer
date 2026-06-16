@@ -1,6 +1,4 @@
-// === PADDLE QUIZ V0 - Milestone 1: Paddle Admin Backend ===
-// Add this to the existing BePickleballer Email Capture Apps Script project.
-// After pasting, run setupPaddleSheets() once from the editor (Run button), then redeploy.
+// Paddle admin backend. Run setupPaddleSheets() once, then redeploy.
 
 function setupPaddleSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();

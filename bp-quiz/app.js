@@ -1,6 +1,4 @@
-// Shared core for the public paddle quiz. Exposes window.bpQuiz with the API
-// helper, state container, and a persisted answers store. quiz.js handles the
-// flow logic and rendering.
+// Shared core: API helper, state, and persisted answers.
 
 window.bpQuiz = (function(){
   var BACKEND_URL = 'https://script.google.com/macros/s/AKfycbz6R0VAaTHsdqXZmx87wJCLhQrwYfLVW42QGaH4FMKu-wdz50MnPdD-R6ZIE-SK6KdJ/exec';
@@ -60,13 +58,7 @@ window.bpQuiz = (function(){
     }
   }
 
-  // When the quiz is embedded in an iframe on WordPress, post our current height
-  // to the parent so the iframe can auto-resize and avoid an inner scrollbar.
-  // We measure the FIRST child's offsetHeight (the actual content), NOT
-  // document.documentElement.scrollHeight, because the latter grows with the
-  // iframe itself when the body has min-height: 100vh - that creates an
-  // infinite feedback loop (parent grows iframe -> 100vh grows -> body grows ->
-  // we report bigger height -> parent grows iframe again -> ...).
+  // Send current height to the parent so the iframe can auto-resize.
   var lastReportedHeight = 0;
   function measureContentHeight() {
     var el = document.getElementById('bp-quiz-app');
