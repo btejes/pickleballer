@@ -1,6 +1,6 @@
 (function(){
-  var QUIZ_BASE = 'https://dmytriisynchuk.github.io/bp-quiz/';
-  var ALLOWED_ORIGIN = 'https://dmytriisynchuk.github.io';
+  var QUIZ_BASE = 'https://btejes.github.io/pickleballer/bp-quiz/';
+  var ALLOWED_ORIGIN = 'https://btejes.github.io';
   var iframe = document.getElementById('bp-paddle-quiz-iframe');
   if (!iframe) return;
 
