@@ -431,7 +431,7 @@
           return '<div class="bp-dim-row">' +
             '<div class="bp-dim-labelblock">' +
               '<div class="bp-dim-label">' + d + '</div>' +
-              '<div class="bp-dim-value"><strong>' + v + '</strong> <span class="bp-dim-value-suffix">/5</span></div>' +
+              '<div class="bp-dim-value"><strong>' + (v * 2) + '</strong> <span class="bp-dim-value-suffix">/10</span></div>' +
             '</div>' +
             '<div class="bp-dim-bar"><div class="bp-dim-bar-fill" style="width: ' + (v * 20) + '%"></div></div>' +
           '</div>';
@@ -634,16 +634,18 @@
       { key: 'Spin',    user: profile.Spin    || 0, paddle: paddle.spin_score    || 0 }
     ];
     var cols = dims.map(function(d){
+      var uDisp = d.user * 2;
+      var pDisp = d.paddle * 2;
       return '<div class="bp-compare-col">' +
         '<div class="bp-compare-col-head">' + d.key + '</div>' +
-        '<div class="bp-compare-col-inline"><span>You ' + d.user + '</span><span class="bp-compare-divider">|</span><span>Paddle ' + d.paddle + '</span></div>' +
+        '<div class="bp-compare-col-inline"><span>You ' + uDisp + '</span><span class="bp-compare-divider">|</span><span>Paddle ' + pDisp + '</span></div>' +
         '<div class="bp-compare-bar-row">' +
           '<div class="bp-compare-cell-bar"><div class="bp-compare-cell-fill you" style="width:' + (d.user * 20) + '%"></div></div>' +
-          '<span class="bp-compare-bar-value">' + d.user + '/5</span>' +
+          '<span class="bp-compare-bar-value">' + uDisp + '/10</span>' +
         '</div>' +
         '<div class="bp-compare-bar-row">' +
           '<div class="bp-compare-cell-bar"><div class="bp-compare-cell-fill paddle" style="width:' + (d.paddle * 20) + '%"></div></div>' +
-          '<span class="bp-compare-bar-value">' + d.paddle + '/5</span>' +
+          '<span class="bp-compare-bar-value">' + pDisp + '/10</span>' +
         '</div>' +
       '</div>';
     }).join('');
