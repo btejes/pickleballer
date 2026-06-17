@@ -84,7 +84,7 @@ window.BP_QUESTIONS = [
     id: 'q7',
     type: 'slider',
     title: 'How aggressive is your play style?',
-    helper: 'Slide between very patient (1) and very aggressive (10).',
+    helper: 'Slide between very patient (1) and very aggressive (5).',
     min: 1,
     max: 5,
     minLabel: 'Patient / control-first',
