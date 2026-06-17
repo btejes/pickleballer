@@ -65,7 +65,7 @@
     subList.innerHTML = '<div class="flex flex-col items-center justify-center gap-3 py-10 text-sm text-slate-500"><div class="w-8 h-8 rounded-full border-[3px] border-brand-100 border-t-brand-600 animate-spin"></div><span class="font-medium">Loading subscribers...</span></div>';
     pagination.classList.add('hidden');
     pagination.classList.remove('flex');
-    api('list_subscribers', { page: currentPage, pageSize: PAGE_SIZE, search: searchTerm }).then(function(res){
+    api('list_subscribers_with_results', { page: currentPage, pageSize: PAGE_SIZE, search: searchTerm }).then(function(res){
       if (!res.success) {
         subCount.textContent = '(Failed)';
         subList.innerHTML = '<div class="px-4 py-8 text-center text-sm text-red-500">Failed to load subscribers</div>';
@@ -98,8 +98,20 @@
         row.className = 'grid grid-cols-[1fr_110px_40px] gap-2 px-4 py-2.5 items-center text-sm hover:bg-slate-50 transition';
         var date = s.timestamp ? new Date(s.timestamp).toLocaleDateString() : '';
         var emailDiv = document.createElement('div');
-        emailDiv.className = 'truncate text-slate-900 font-medium text-xs';
-        emailDiv.textContent = s.email;
+        emailDiv.className = 'truncate text-xs';
+        if (s.result_url) {
+          var link = document.createElement('a');
+          link.href = s.result_url;
+          link.target = '_blank';
+          link.rel = 'noopener';
+          link.className = 'text-brand-700 font-medium hover:underline';
+          link.title = 'View results';
+          link.textContent = s.email;
+          emailDiv.appendChild(link);
+        } else {
+          emailDiv.className += ' text-slate-900 font-medium';
+          emailDiv.textContent = s.email;
+        }
         var dateDiv = document.createElement('div');
         dateDiv.className = 'text-xs text-slate-500';
         dateDiv.textContent = date;

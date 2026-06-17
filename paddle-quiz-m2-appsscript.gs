@@ -442,6 +442,66 @@ function handleSubmitQuiz(data) {
   });
 }
 
+// Returns subscribers enriched with a results URL when their email has a
+// matching completion. Admin uses this to make each email row clickable so Ben
+// can preview the results that visitor saw.
+function handleListSubscribersWithResults(data) {
+  var subs = getSubscribersSheet();
+  if (!subs) return jsonResponse({ success: false, error: 'Subscribers sheet missing' });
+  var completions = getCompletionsSheet();
+
+  var emailToId = {};
+  if (completions) {
+    var cvals = completions.getDataRange().getValues();
+    for (var i = 1; i < cvals.length; i++) {
+      var cid = String(cvals[i][0] || '').trim();
+      var cemail = String(cvals[i][2] || '').trim().toLowerCase();
+      var ctime = cvals[i][1];
+      if (!cid || !cemail) continue;
+      var prior = emailToId[cemail];
+      if (!prior || (ctime && (!prior.ts || new Date(ctime) > new Date(prior.ts)))) {
+        emailToId[cemail] = { id: cid, ts: ctime };
+      }
+    }
+  }
+
+  var publicUrl = getQuizPublicUrl();
+  var svals = subs.getDataRange().getValues();
+  var search = String(data.search || '').trim().toLowerCase();
+  var rows = [];
+  for (var j = 1; j < svals.length; j++) {
+    var email = String(svals[j][1] || '').trim().toLowerCase();
+    if (!email) continue;
+    if (search && email.indexOf(search) === -1) continue;
+    var match = emailToId[email];
+    var resultUrl = (match && publicUrl) ? (publicUrl + '/?r=' + encodeURIComponent(match.id)) : '';
+    rows.push({
+      timestamp: svals[j][0],
+      email: svals[j][1],
+      source: svals[j][2] || '',
+      result_id: match ? match.id : '',
+      result_url: resultUrl
+    });
+  }
+  rows.sort(function(a, b){ return new Date(b.timestamp) - new Date(a.timestamp); });
+
+  var page = parseInt(data.page, 10) || 1;
+  var pageSize = parseInt(data.pageSize, 10) || 20;
+  var total = rows.length;
+  var totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (page > totalPages) page = totalPages;
+  var start = (page - 1) * pageSize;
+  var pageRows = rows.slice(start, start + pageSize);
+
+  return jsonResponse({
+    success: true,
+    subscribers: pageRows,
+    total: total,
+    page: page,
+    totalPages: totalPages
+  });
+}
+
 function handleAttachEmail(data) {
   var id = String(data.id || '').trim();
   var email = String(data.email || '').trim().toLowerCase();
