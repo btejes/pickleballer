@@ -442,6 +442,60 @@ function handleSubmitQuiz(data) {
   });
 }
 
+// Admin Events tab: all completions with email status + their paddle clicks.
+function handleListEvents(data) {
+  var completions = getCompletionsSheet();
+  if (!completions) return jsonResponse({ success: false, error: 'Completions sheet missing' });
+  var clicks = getClicksSheet();
+
+  var clicksByCompletion = {};
+  if (clicks) {
+    var cvals = clicks.getDataRange().getValues();
+    for (var i = 1; i < cvals.length; i++) {
+      var compId = String(cvals[i][2] || '').trim();
+      if (!compId) continue;
+      if (!clicksByCompletion[compId]) clicksByCompletion[compId] = [];
+      clicksByCompletion[compId].push({
+        timestamp: cvals[i][1],
+        paddle_id: cvals[i][3],
+        paddle_name: cvals[i][4]
+      });
+    }
+  }
+
+  var publicUrl = getQuizPublicUrl();
+  var rows = completions.getDataRange().getValues();
+  var events = [];
+  for (var j = 1; j < rows.length; j++) {
+    var id = String(rows[j][0] || '').trim();
+    if (!id) continue;
+    events.push({
+      id: id,
+      timestamp: rows[j][1],
+      email: rows[j][2] || '',
+      result_url: publicUrl ? (publicUrl + '/?r=' + encodeURIComponent(id)) : '',
+      paddle_clicks: clicksByCompletion[id] || []
+    });
+  }
+  events.sort(function(a, b){ return new Date(b.timestamp) - new Date(a.timestamp); });
+
+  var page = parseInt(data.page, 10) || 1;
+  var pageSize = parseInt(data.pageSize, 10) || 25;
+  var total = events.length;
+  var totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (page > totalPages) page = totalPages;
+  var start = (page - 1) * pageSize;
+  var pageEvents = events.slice(start, start + pageSize);
+
+  return jsonResponse({
+    success: true,
+    events: pageEvents,
+    total: total,
+    page: page,
+    totalPages: totalPages
+  });
+}
+
 // Returns subscribers enriched with a results URL when their email has a
 // matching completion. Admin uses this to make each email row clickable so Ben
 // can preview the results that visitor saw.

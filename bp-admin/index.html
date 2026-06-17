@@ -70,6 +70,7 @@
         <button type="button" data-tab="paddles" class="bp-tab-btn px-3 py-1.5 text-sm font-semibold rounded-md transition">Paddles</button>
         <button type="button" data-tab="categories" class="bp-tab-btn px-3 py-1.5 text-sm font-semibold rounded-md transition">Categories</button>
         <button type="button" data-tab="mappings" class="bp-tab-btn px-3 py-1.5 text-sm font-semibold rounded-md transition">Quiz Mapping</button>
+        <button type="button" data-tab="events" class="bp-tab-btn px-3 py-1.5 text-sm font-semibold rounded-md transition">Events</button>
       </nav>
       <button id="bp-logout-btn" class="text-sm font-semibold text-slate-700 hover:text-red-600 px-3 py-1.5 border border-slate-200 rounded-lg hover:border-red-200 hover:bg-red-50 transition">Logout</button>
     </div>
@@ -201,6 +202,38 @@
       </section>
     </div>
 
+    <!-- ============ Events Tab ============ -->
+    <div id="bp-tab-events" class="bp-tab-content hidden">
+      <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <div>
+            <h2 class="text-base font-bold text-slate-900 mb-1">Events <span id="bp-events-count" class="text-slate-400 font-medium text-sm ml-1">(0)</span></h2>
+            <p class="text-sm text-slate-500">Every quiz completion with their email (if provided) and which paddles they clicked. Times shown in your local timezone.</p>
+          </div>
+        </div>
+        <div class="border border-slate-200 rounded-lg overflow-hidden">
+          <div class="grid grid-cols-[140px_1fr_70px_2fr_100px] gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <div>Date / Time</div>
+            <div>Email</div>
+            <div class="text-center">Clicks</div>
+            <div>Paddles Clicked</div>
+            <div></div>
+          </div>
+          <div id="bp-events-list" class="divide-y divide-slate-100 max-h-[600px] overflow-y-auto"></div>
+          <div id="bp-events-pagination" class="hidden items-center justify-between border-t border-slate-200 px-4 py-3 text-xs">
+            <div class="text-slate-500">
+              Showing <span class="font-semibold text-slate-700" id="bp-events-page-range">0</span> of <span class="font-semibold text-slate-700" id="bp-events-page-total">0</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" id="bp-events-prev-btn" class="px-2.5 py-1.5 border border-slate-200 rounded-md hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1">Prev</button>
+              <span class="text-slate-500" id="bp-events-page-info">Page 1 of 1</span>
+              <button type="button" id="bp-events-next-btn" class="px-2.5 py-1.5 border border-slate-200 rounded-md hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1">Next</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
   </main>
 </div>
 
@@ -311,5 +344,6 @@
 <script src="categories.js"></script>
 <script src="paddles.js"></script>
 <script src="mappings.js"></script>
+<script src="events.js"></script>
 </body>
 </html>
