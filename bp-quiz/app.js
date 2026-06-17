@@ -1,5 +1,3 @@
-// Shared core: API helper, state, and persisted answers.
-
 window.bpQuiz = (function(){
   var BACKEND_URL = 'https://script.google.com/macros/s/AKfycbz6R0VAaTHsdqXZmx87wJCLhQrwYfLVW42QGaH4FMKu-wdz50MnPdD-R6ZIE-SK6KdJ/exec';
   var STORAGE_KEY = 'bp_quiz_state_v1';
@@ -36,7 +34,6 @@ window.bpQuiz = (function(){
       var params = new URLSearchParams(window.location.search);
       var id = (params.get('r') || '').trim();
       if (id) return id;
-      // Fallback: support /results/[id] style paths if WordPress ever rewrites to that
       var match = window.location.pathname.match(/\/results\/([A-Za-z0-9_-]+)/);
       if (match) return match[1];
     } catch (err) {}
@@ -50,7 +47,6 @@ window.bpQuiz = (function(){
       url.searchParams.set('r', id);
       window.history.replaceState({}, '', url.toString());
     } catch (err) {}
-    // If embedded, tell the parent so it can mirror the id into its URL bar
     if (window.parent !== window) {
       try {
         window.parent.postMessage({ type: 'bp-quiz-result-id', id: id }, '*');
@@ -58,7 +54,6 @@ window.bpQuiz = (function(){
     }
   }
 
-  // Send current height to the parent so the iframe can auto-resize.
   var lastReportedHeight = 0;
   function measureContentHeight() {
     var el = document.getElementById('bp-quiz-app');

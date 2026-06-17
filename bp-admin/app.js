@@ -1,6 +1,3 @@
-// Shared core: BACKEND_URL, creds, api helper, login/logout, tab switching, toast.
-// Feature modules (subscribers, paddles, categories) register init/load hooks via window.bpAdmin.
-
 window.bpAdmin = (function(){
   var BACKEND_URL = "https://script.google.com/macros/s/AKfycbz6R0VAaTHsdqXZmx87wJCLhQrwYfLVW42QGaH4FMKu-wdz50MnPdD-R6ZIE-SK6KdJ/exec";
   var creds = null;

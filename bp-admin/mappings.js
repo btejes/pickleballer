@@ -1,7 +1,3 @@
-// Quiz Mapping admin tab. For each quiz answer (single + multi questions),
-// let Ben pick which categories that answer should award points to.
-// Sliders and the Q1 search are skipped (they do not contribute to matching in V0).
-
 (function(){
   var api = window.bpAdmin.api;
   var showToast = window.bpAdmin.showToast;
@@ -10,7 +6,6 @@
   var listEl = document.getElementById('bp-mapping-list');
   var saveBtn = document.getElementById('bp-mapping-save-btn');
 
-  // mappings: { questionId: { answerId: [categoryName, ...] } }
   var mappings = {};
 
   function loadAll() {

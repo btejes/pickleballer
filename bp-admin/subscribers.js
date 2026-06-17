@@ -1,5 +1,3 @@
-// Subscriber list, CSV import, and newsletter compose/send. Uses window.bpAdmin from app.js.
-
 (function(){
   var api = window.bpAdmin.api;
   var showToast = window.bpAdmin.showToast;

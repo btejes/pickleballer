@@ -1,11 +1,8 @@
-// Quiz engine backend. Run setupQuizSheets() once, then redeploy.
-
 function getQuizPublicUrl() {
   var v = PropertiesService.getScriptProperties().getProperty('BP_QUIZ_PUBLIC_URL');
   return (v || '').replace(/\/+$/, '');
 }
 
-// Base categories are hardcoded and map 1:1 to paddle performance scores.
 var BP_BASE_CATEGORIES = ['Power', 'Control', 'Spin'];
 
 function isBaseCategory(name) {
@@ -24,16 +21,12 @@ function paddleBaseScore(paddle, catName) {
   return 0;
 }
 
-// Map slider/Likert value (1-5) to contribution multiplier (-2..+2).
 function sliderMultiplier(value) {
   var v = parseInt(value, 10);
-  if (isNaN(v)) return 0;
-  if (v <= 0 || v > 5) return 0;
-  return v - 3; // 1=>-2, 2=>-1, 3=>0, 4=>+1, 5=>+2
+  if (isNaN(v) || v <= 0 || v > 5) return 0;
+  return v - 3;
 }
 
-// Convert any paddle scores still on the 1-10 scale to the 1-5 scale (halving, rounded).
-// Run this ONCE after deploying the new model, then never again.
 function migratePaddleScoresTo1to5() {
   var sheet = getPaddlesSheet();
   if (!sheet) { Logger.log('Paddles sheet missing'); return; }
@@ -41,7 +34,6 @@ function migratePaddleScoresTo1to5() {
   var updated = 0;
   for (var i = 1; i < values.length; i++) {
     var changed = false;
-    // Columns I, J, K = power_score, control_score, spin_score (1-indexed letters)
     [8, 9, 10].forEach(function(col){
       var v = Number(values[i][col]);
       if (v > 5) {
@@ -97,7 +89,6 @@ function setupQuizSheets() {
     clicks.setFrozenRows(1);
   }
 
-  // Seed base categories in the Categories sheet if missing.
   var catsSheet = ss.getSheetByName('Categories');
   if (catsSheet) {
     var existing = catsSheet.getDataRange().getValues();
@@ -127,10 +118,6 @@ function getClicksSheet() {
   return SpreadsheetApp.getActiveSpreadsheet().getSheetByName('PaddleClicks');
 }
 
-// ----------------------------------------------------------------------------
-// Quiz mappings (which categories each answer awards)
-// ----------------------------------------------------------------------------
-
 function loadMappings() {
   var sheet = getMappingsSheet();
   if (!sheet) return {};
@@ -155,7 +142,6 @@ function handleSaveMappings(data) {
   var sheet = getMappingsSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Mappings sheet missing, run setupQuizSheets()' });
   var mappings = data.mappings || {};
-  // Wipe existing rows, write fresh
   if (sheet.getLastRow() > 1) {
     sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).clearContent();
   }
@@ -174,10 +160,6 @@ function handleSaveMappings(data) {
   return jsonResponse({ success: true, rows: rows.length });
 }
 
-// ----------------------------------------------------------------------------
-// Paddle search (autocomplete for Q1)
-// ----------------------------------------------------------------------------
-
 function handlePaddleSearch(data) {
   var query = String(data.query || '').trim().toLowerCase();
   if (query.length < 2) return jsonResponse({ success: true, results: [] });
@@ -195,13 +177,7 @@ function handlePaddleSearch(data) {
   return jsonResponse({ success: true, results: results });
 }
 
-// ----------------------------------------------------------------------------
-// Matching engine (simple +1 per category match, with hard filters)
-// ----------------------------------------------------------------------------
-
 function runMatching(answers) {
-  // answers: { q1: 'q1_search', q2: 'q2_power', q30: ['q30_tennis','q30_squash'], q7: 7, ... }
-
   var mappings = loadMappings();
   var paddlesSheet = getPaddlesSheet();
   if (!paddlesSheet) return { paddles: [], duprMin: 0, duprMax: 7, budgetMax: 99999 };
@@ -224,7 +200,6 @@ function runMatching(answers) {
     if (q5Def && typeof q5Def.duprMax === 'number') duprMax = q5Def.duprMax;
   }
 
-  // Apply budget filter from Q31
   var budgetMax = 99999;
   var q31Answer = answers.q31;
   if (q31Answer) {
@@ -232,7 +207,6 @@ function runMatching(answers) {
     if (q31Def && typeof q31Def.budgetMax === 'number') budgetMax = q31Def.budgetMax;
   }
 
-  // Filter paddles
   var filtered = allPaddles.filter(function(p){
     var price = Number(p.price) || 0;
     if (price > 0 && price > budgetMax) return false;
@@ -247,20 +221,12 @@ function runMatching(answers) {
     return true;
   });
 
-  // Fallback: if no paddles passed the hard filters, score the full catalog
-  // instead of returning empty. Set a flag so the UI can tell the user.
   var filtersRelaxed = false;
   if (filtered.length === 0 && allPaddles.length > 0) {
     filtered = allPaddles.slice();
     filtersRelaxed = true;
   }
 
-  // Score each paddle with the new model:
-  //   - Base category (Power/Control/Spin): paddle.match += paddle[dim_score] * multiplier
-  //   - Extra category: paddle has tag ? paddle.match += multiplier : 0
-  // Multiplier is +1 for regular answers, -2..+2 for slider/Likert (1-5) answers.
-
-  // Build extra-category tag lookup per paddle.
   var paddleCats = {};
   filtered.forEach(function(p){
     paddleCats[p.id] = {};
@@ -275,15 +241,14 @@ function runMatching(answers) {
   Object.keys(answers).forEach(function(qid){
     var answer = answers[qid];
 
-    // Slider values arrive as numbers. Treat them as Likert-style 1-5.
     var isSlider = (typeof answer === 'number');
     var multiplier;
     var answerIds;
 
     if (isSlider) {
       multiplier = sliderMultiplier(answer);
-      if (multiplier === 0) return; // neutral, no effect
-      answerIds = ['__slider__']; // we use the question-level mapping under a fixed key
+      if (multiplier === 0) return;
+      answerIds = ['__slider__'];
     } else if (Array.isArray(answer)) {
       multiplier = 1;
       answerIds = answer;
@@ -297,12 +262,10 @@ function runMatching(answers) {
       cats.forEach(function(cat){
         var catLower = String(cat).toLowerCase();
         if (isBaseCategory(cat)) {
-          // Base: paddle's dimension score times multiplier
           filtered.forEach(function(p){
             scores[p.id] += paddleBaseScore(p, cat) * multiplier;
           });
         } else {
-          // Extra: flat multiplier if paddle tagged
           filtered.forEach(function(p){
             if (paddleCats[p.id][catLower]) scores[p.id] += multiplier;
           });
@@ -311,7 +274,6 @@ function runMatching(answers) {
     });
   });
 
-  // Sort by score desc, tiebreak by name
   filtered.sort(function(a, b){
     var sa = scores[a.id] || 0;
     var sb = scores[b.id] || 0;
@@ -337,12 +299,6 @@ function runMatching(answers) {
     };
   });
 
-  // Derive playing-style profile on a 1-5 scale.
-  // V0 rule: user profile per dimension = the slider answer for that dimension's
-  // importance question. If not answered, default to 3 (neutral).
-  //   Power  <- Q14 (How important is power)
-  //   Control <- Q15 (How important is control)
-  //   Spin   <- Q13 (How important is spin)
   function clamp15(v) { return Math.max(1, Math.min(5, parseInt(v, 10) || 3)); }
   var profile = {
     Power:   clamp15(answers.q14),
@@ -368,7 +324,6 @@ function parseDuprTier(tier) {
   return isNaN(n) ? null : n;
 }
 
-// DUPR + budget filter ranges. Change ranges here.
 var FILTER_ANSWERS = {
   'q5_beginner': { duprMin: 0, duprMax: 2.9 },
   'q5_30':       { duprMin: 2.8, duprMax: 3.4 },
@@ -391,10 +346,6 @@ function findAnswerInQuestions(qid, aid) {
 function handleListFilters(data) {
   return jsonResponse({ success: true, filters: FILTER_ANSWERS });
 }
-
-// ----------------------------------------------------------------------------
-// Submit + Get result
-// ----------------------------------------------------------------------------
 
 function handleSubmitQuiz(data) {
   var answers = data.answers || {};
@@ -427,7 +378,6 @@ function handleSubmitQuiz(data) {
     ]);
   }
 
-  // If email provided, add to Subscribers sheet (unified newsletter list)
   if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     var subs = getSubscribersSheet();
     if (subs) {
@@ -449,7 +399,6 @@ function handleSubmitQuiz(data) {
   });
 }
 
-// Admin Events tab: all completions with email status + their paddle clicks.
 function handleListEvents(data) {
   var completions = getCompletionsSheet();
   if (!completions) return jsonResponse({ success: false, error: 'Completions sheet missing' });
@@ -503,9 +452,6 @@ function handleListEvents(data) {
   });
 }
 
-// Returns subscribers enriched with a results URL when their email has a
-// matching completion. Admin uses this to make each email row clickable so Ben
-// can preview the results that visitor saw.
 function handleListSubscribersWithResults(data) {
   var subs = getSubscribersSheet();
   if (!subs) return jsonResponse({ success: false, error: 'Subscribers sheet missing' });
@@ -574,12 +520,10 @@ function handleAttachEmail(data) {
   var sheet = getCompletionsSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Completions sheet missing' });
   var values = sheet.getDataRange().getValues();
-  Logger.log('attach_email looking for id: ' + id + ' across ' + (values.length - 1) + ' rows');
   for (var i = 1; i < values.length; i++) {
     if (String(values[i][0]).trim() === id) {
       sheet.getRange(i + 1, 3).setValue(email);
       SpreadsheetApp.flush();
-      Logger.log('attach_email wrote ' + email + ' to row ' + (i + 1));
 
       var subs = getSubscribersSheet();
       if (subs) {
@@ -591,27 +535,17 @@ function handleAttachEmail(data) {
         if (!found) subs.appendRow([new Date(), email, 'quiz']);
       }
 
-      // Build and send the results email via Resend. If the send fails, we still
-      // return success because the email is saved and we do not want to lose it.
       try {
-        var sendOk = sendResultsEmail(email, id);
-        Logger.log('Resend send ok? ' + sendOk);
-      } catch (sendErr) {
-        Logger.log('Resend send threw: ' + sendErr);
-      }
+        sendResultsEmail(email, id);
+      } catch (sendErr) {}
 
       return jsonResponse({ success: true });
     }
   }
-  Logger.log('attach_email FAILED to find id: ' + id);
   return jsonResponse({ success: false, error: 'Result not found' });
 }
 
-// ----------------------------------------------------------------------------
-// Results email via Resend
-// ----------------------------------------------------------------------------
-
-function sendResultsEmail(toEmail, completionId, paddles, profile) {
+function sendResultsEmail(toEmail, completionId) {
   var props = PropertiesService.getScriptProperties();
   var apiKey = props.getProperty('RESEND_API_KEY');
   if (!apiKey) { Logger.log('RESEND_API_KEY missing'); return false; }
@@ -636,10 +570,8 @@ function sendResultsEmail(toEmail, completionId, paddles, profile) {
       muteHttpExceptions: true
     });
     var code = resp.getResponseCode();
-    Logger.log('Resend response code: ' + code + ' body: ' + resp.getContentText());
     return code >= 200 && code < 300;
   } catch (err) {
-    Logger.log('Resend fetch error: ' + err);
     return false;
   }
 }
@@ -694,8 +626,6 @@ function handleGetResult(data) {
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
-      // Re-derive paddles by re-running the match? Or return stored summary?
-      // We stored top_paddles_json with just id/name/score. To return full data, re-run match.
       var answers = {};
       try { answers = JSON.parse(values[i][6] || '{}'); } catch (err) {}
       var result = runMatching(answers);
@@ -715,10 +645,6 @@ function handleGetResult(data) {
   }
   return jsonResponse({ success: false, error: 'Result not found' });
 }
-
-// ----------------------------------------------------------------------------
-// Paddle click tracking (will be wired in M4, defining now so the sheet exists)
-// ----------------------------------------------------------------------------
 
 function handleTrackClick(data) {
   var sheet = getClicksSheet();

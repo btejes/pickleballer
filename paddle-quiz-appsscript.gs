@@ -1,5 +1,3 @@
-// Paddle admin backend. Run setupPaddleSheets() once, then redeploy.
-
 function setupPaddleSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 

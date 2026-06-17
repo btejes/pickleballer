@@ -1,5 +1,3 @@
-// Events tab. Shows every quiz completion with email status and paddle clicks.
-
 (function(){
   var api = window.bpAdmin.api;
   var showToast = window.bpAdmin.showToast;

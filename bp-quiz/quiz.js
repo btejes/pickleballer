@@ -1,6 +1,3 @@
-// Quiz flow logic: renders one question at a time, handles answers, navigates,
-// shows progress, and submits at the end.
-
 (function(){
   var QUESTIONS = window.BP_QUESTIONS || [];
   var api = window.bpQuiz.api;
@@ -301,7 +298,6 @@
     });
     container.appendChild(list);
 
-    // Show the search box if the search option is the current selection
     if (current === 'q1_search') {
       renderSearchBox(container, q);
     }
@@ -412,8 +408,6 @@
     top.innerHTML = '<span>Your Results</span><span class="text-xs font-semibold text-emerald-600 inline-flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>Quiz complete</span>';
     doc.appendChild(top);
 
-    // --- Playing Style Profile ---
-    // Profile is on a 1-5 scale (base = 3, max = 5)
     var profile = r.profile || { Control: 3, Power: 3, Spin: 3 };
     var profCard = document.createElement('div');
     profCard.className = 'bp-profile-card';
@@ -460,7 +454,6 @@
       empty.textContent = 'No paddles available right now. Please check back soon.';
       doc.appendChild(empty);
     } else {
-      // Compute match % using option A (relative to top score, capped 60-99)
       var topScore = r.paddles[0].score || 0;
       r.paddles.forEach(function(p, idx){
         if (topScore === 0) {
@@ -535,7 +528,6 @@
       '<button type="button" id="bp-email-submit" class="bp-email-submit">Email My Results</button>';
     doc.appendChild(emailCard);
 
-    // Wire up email submit (M4 will fully build the email flow; for now we just acknowledge)
     setTimeout(function(){
       var input = document.getElementById('bp-email-input');
       var submit = document.getElementById('bp-email-submit');
@@ -581,7 +573,6 @@
 
     rSlot.appendChild(doc);
 
-    // Track View Product clicks (event delegation so it works for all 3 cards)
     if (!rSlot._bpClickWired) {
       rSlot.addEventListener('click', function(e){
         var a = e.target.closest && e.target.closest('a.bp-view-btn');
@@ -604,7 +595,6 @@
         btn.addEventListener('click', function(){
           window.bpQuiz.clearState();
           state = { currentIndex: 0, answers: {}, currentPaddleName: '' };
-          // Strip the ?r= param so a refresh starts the quiz fresh
           try {
             var url = new URL(window.location.href);
             url.searchParams.delete('r');
@@ -668,7 +658,6 @@
   }
 
   document.addEventListener('DOMContentLoaded', start);
-  // If DOM already ready (script at bottom), kick off immediately
   if (document.readyState === 'complete' || document.readyState === 'interactive') {
     setTimeout(start, 0);
   }
