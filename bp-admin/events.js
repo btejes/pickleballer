@@ -1,22 +1,22 @@
 (function(){
-  var api = window.bpAdmin.api;
-  var showToast = window.bpAdmin.showToast;
+  let api = window.bpAdmin.api;
+  let showToast = window.bpAdmin.showToast;
 
-  var listEl = document.getElementById('bp-events-list');
-  var countEl = document.getElementById('bp-events-count');
-  var pagination = document.getElementById('bp-events-pagination');
-  var pageRangeEl = document.getElementById('bp-events-page-range');
-  var pageTotalEl = document.getElementById('bp-events-page-total');
-  var pageInfoEl = document.getElementById('bp-events-page-info');
-  var prevBtn = document.getElementById('bp-events-prev-btn');
-  var nextBtn = document.getElementById('bp-events-next-btn');
+  let listEl = document.getElementById('bp-events-list');
+  let countEl = document.getElementById('bp-events-count');
+  let pagination = document.getElementById('bp-events-pagination');
+  let pageRangeEl = document.getElementById('bp-events-page-range');
+  let pageTotalEl = document.getElementById('bp-events-page-total');
+  let pageInfoEl = document.getElementById('bp-events-page-info');
+  let prevBtn = document.getElementById('bp-events-prev-btn');
+  let nextBtn = document.getElementById('bp-events-next-btn');
 
-  var currentPage = 1;
-  var PAGE_SIZE = 25;
+  let currentPage = 1;
+  const PAGE_SIZE = 25;
 
   function fmtTime(ts) {
     if (!ts) return '';
-    var d = new Date(ts);
+    let d = new Date(ts);
     if (isNaN(d.getTime())) return '';
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
@@ -30,9 +30,9 @@
         listEl.innerHTML = '<div class="px-4 py-8 text-center text-sm text-red-500">' + (res.error || 'Failed to load events') + '</div>';
         return;
       }
-      var events = res.events || [];
-      var total = typeof res.total === 'number' ? res.total : events.length;
-      var totalPages = res.totalPages || Math.max(1, Math.ceil(total / PAGE_SIZE));
+      let events = res.events || [];
+      let total = typeof res.total === 'number' ? res.total : events.length;
+      let totalPages = res.totalPages || Math.max(1, Math.ceil(total / PAGE_SIZE));
       currentPage = res.page || currentPage;
       countEl.textContent = '(' + total + ')';
       listEl.innerHTML = '';
@@ -43,8 +43,8 @@
       if (total > PAGE_SIZE) {
         pagination.classList.remove('hidden');
         pagination.classList.add('flex');
-        var startIdx = (currentPage - 1) * PAGE_SIZE + 1;
-        var endIdx = Math.min(startIdx + events.length - 1, total);
+        let startIdx = (currentPage - 1) * PAGE_SIZE + 1;
+        let endIdx = Math.min(startIdx + events.length - 1, total);
         pageRangeEl.textContent = startIdx + '-' + endIdx;
         pageTotalEl.textContent = total;
         pageInfoEl.textContent = 'Page ' + currentPage + ' of ' + totalPages;
@@ -52,14 +52,14 @@
         nextBtn.disabled = currentPage >= totalPages;
       }
       events.forEach(function(ev){
-        var row = document.createElement('div');
+        let row = document.createElement('div');
         row.className = 'grid grid-cols-[140px_1fr_70px_2fr_100px] gap-3 px-4 py-2.5 items-center text-sm hover:bg-slate-50 transition';
 
-        var dateDiv = document.createElement('div');
+        let dateDiv = document.createElement('div');
         dateDiv.className = 'text-xs text-slate-600';
         dateDiv.textContent = fmtTime(ev.timestamp);
 
-        var emailDiv = document.createElement('div');
+        let emailDiv = document.createElement('div');
         emailDiv.className = 'truncate text-xs';
         if (ev.email) {
           emailDiv.classList.add('text-slate-900', 'font-medium');
@@ -69,9 +69,9 @@
           emailDiv.textContent = 'no email';
         }
 
-        var clicksDiv = document.createElement('div');
+        let clicksDiv = document.createElement('div');
         clicksDiv.className = 'text-center text-xs font-semibold';
-        var clickCount = (ev.paddle_clicks || []).length;
+        let clickCount = (ev.paddle_clicks || []).length;
         if (clickCount > 0) {
           clicksDiv.classList.add('text-emerald-600');
         } else {
@@ -79,9 +79,9 @@
         }
         clicksDiv.textContent = clickCount;
 
-        var paddlesDiv = document.createElement('div');
+        let paddlesDiv = document.createElement('div');
         paddlesDiv.className = 'truncate text-xs text-slate-600';
-        var names = (ev.paddle_clicks || []).map(function(c){ return c.paddle_name; }).filter(Boolean);
+        let names = (ev.paddle_clicks || []).map(function(c){ return c.paddle_name; }).filter(Boolean);
         if (names.length === 0) {
           paddlesDiv.classList.add('text-slate-300');
           paddlesDiv.textContent = '-';
@@ -90,10 +90,10 @@
           paddlesDiv.title = names.join(', ');
         }
 
-        var linkDiv = document.createElement('div');
+        let linkDiv = document.createElement('div');
         linkDiv.className = 'text-right text-xs';
         if (ev.result_url) {
-          var a = document.createElement('a');
+          let a = document.createElement('a');
           a.href = ev.result_url;
           a.target = '_blank';
           a.rel = 'noopener';

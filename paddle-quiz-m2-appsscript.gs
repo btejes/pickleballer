@@ -1,20 +1,20 @@
 function getQuizPublicUrl() {
-  var v = PropertiesService.getScriptProperties().getProperty('BP_QUIZ_PUBLIC_URL');
+  let v = PropertiesService.getScriptProperties().getProperty('BP_QUIZ_PUBLIC_URL');
   return (v || '').replace(/\/+$/, '');
 }
 
-var BP_BASE_CATEGORIES = ['Power', 'Control', 'Spin'];
+const BP_BASE_CATEGORIES = ['Power', 'Control', 'Spin'];
 
 function isBaseCategory(name) {
-  var n = String(name || '').trim().toLowerCase();
-  for (var i = 0; i < BP_BASE_CATEGORIES.length; i++) {
+  let n = String(name || '').trim().toLowerCase();
+  for (let i = 0; i < BP_BASE_CATEGORIES.length; i++) {
     if (BP_BASE_CATEGORIES[i].toLowerCase() === n) return true;
   }
   return false;
 }
 
 function paddleBaseScore(paddle, catName) {
-  var n = String(catName || '').toLowerCase();
+  let n = String(catName || '').toLowerCase();
   if (n === 'power') return Number(paddle.power_score) || 0;
   if (n === 'control') return Number(paddle.control_score) || 0;
   if (n === 'spin') return Number(paddle.spin_score) || 0;
@@ -22,22 +22,22 @@ function paddleBaseScore(paddle, catName) {
 }
 
 function sliderMultiplier(value) {
-  var v = parseInt(value, 10);
+  let v = parseInt(value, 10);
   if (isNaN(v) || v <= 0 || v > 5) return 0;
   return v - 3;
 }
 
 function migratePaddleScoresTo1to5() {
-  var sheet = getPaddlesSheet();
+  let sheet = getPaddlesSheet();
   if (!sheet) { Logger.log('Paddles sheet missing'); return; }
-  var values = sheet.getDataRange().getValues();
-  var updated = 0;
-  for (var i = 1; i < values.length; i++) {
-    var changed = false;
+  let values = sheet.getDataRange().getValues();
+  let updated = 0;
+  for (let i = 1; i < values.length; i++) {
+    let changed = false;
     [8, 9, 10].forEach(function(col){
-      var v = Number(values[i][col]);
+      let v = Number(values[i][col]);
       if (v > 5) {
-        var nv = Math.max(1, Math.min(5, Math.round(v / 2)));
+        let nv = Math.max(1, Math.min(5, Math.round(v / 2)));
         sheet.getRange(i + 1, col + 1).setValue(nv);
         changed = true;
       }
@@ -48,52 +48,52 @@ function migratePaddleScoresTo1to5() {
 }
 
 function isBaseCategoryById(id) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('Categories');
+  let ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('Categories');
   if (!sheet) return false;
-  var values = sheet.getDataRange().getValues();
-  for (var i = 1; i < values.length; i++) {
+  let values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
     if (values[i][0] === id) return isBaseCategory(values[i][1]);
   }
   return false;
 }
 
 function setupQuizSheets() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  let ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  var completions = ss.getSheetByName('Completions');
+  let completions = ss.getSheetByName('Completions');
   if (!completions) {
     completions = ss.insertSheet('Completions');
-    var completionHeaders = ['id','created_at','email','dupr_min','dupr_max','budget_max','answers_json','top_paddles_json','playing_style','user_agent','referrer'];
+    let completionHeaders = ['id','created_at','email','dupr_min','dupr_max','budget_max','answers_json','top_paddles_json','playing_style','user_agent','referrer'];
     completions.getRange(1, 1, 1, completionHeaders.length).setValues([completionHeaders]);
     completions.getRange(1, 1, 1, completionHeaders.length).setFontWeight('bold').setBackground('#f1f5f9');
     completions.setFrozenRows(1);
   }
 
-  var mappings = ss.getSheetByName('QuizMappings');
+  let mappings = ss.getSheetByName('QuizMappings');
   if (!mappings) {
     mappings = ss.insertSheet('QuizMappings');
-    var mappingHeaders = ['question_id','answer_id','categories'];
+    let mappingHeaders = ['question_id','answer_id','categories'];
     mappings.getRange(1, 1, 1, mappingHeaders.length).setValues([mappingHeaders]);
     mappings.getRange(1, 1, 1, mappingHeaders.length).setFontWeight('bold').setBackground('#f1f5f9');
     mappings.setFrozenRows(1);
     mappings.setColumnWidths(1, mappingHeaders.length, 200);
   }
 
-  var clicks = ss.getSheetByName('PaddleClicks');
+  let clicks = ss.getSheetByName('PaddleClicks');
   if (!clicks) {
     clicks = ss.insertSheet('PaddleClicks');
-    var clickHeaders = ['id','created_at','completion_id','paddle_id','paddle_name'];
+    let clickHeaders = ['id','created_at','completion_id','paddle_id','paddle_name'];
     clicks.getRange(1, 1, 1, clickHeaders.length).setValues([clickHeaders]);
     clicks.getRange(1, 1, 1, clickHeaders.length).setFontWeight('bold').setBackground('#f1f5f9');
     clicks.setFrozenRows(1);
   }
 
-  var catsSheet = ss.getSheetByName('Categories');
+  let catsSheet = ss.getSheetByName('Categories');
   if (catsSheet) {
-    var existing = catsSheet.getDataRange().getValues();
-    var existingNames = {};
-    for (var i = 1; i < existing.length; i++) {
+    let existing = catsSheet.getDataRange().getValues();
+    let existingNames = {};
+    for (let i = 1; i < existing.length; i++) {
       if (existing[i][1]) existingNames[String(existing[i][1]).toLowerCase()] = true;
     }
     BP_BASE_CATEGORIES.forEach(function(name){
@@ -119,14 +119,14 @@ function getClicksSheet() {
 }
 
 function loadMappings() {
-  var sheet = getMappingsSheet();
+  let sheet = getMappingsSheet();
   if (!sheet) return {};
-  var values = sheet.getDataRange().getValues();
-  var map = {};
-  for (var i = 1; i < values.length; i++) {
-    var qid = String(values[i][0] || '').trim();
-    var aid = String(values[i][1] || '').trim();
-    var cats = String(values[i][2] || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  let values = sheet.getDataRange().getValues();
+  let map = {};
+  for (let i = 1; i < values.length; i++) {
+    let qid = String(values[i][0] || '').trim();
+    let aid = String(values[i][1] || '').trim();
+    let cats = String(values[i][2] || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
     if (!qid || !aid) continue;
     if (!map[qid]) map[qid] = {};
     map[qid][aid] = cats;
@@ -139,18 +139,18 @@ function handleListMappings(data) {
 }
 
 function handleSaveMappings(data) {
-  var sheet = getMappingsSheet();
+  let sheet = getMappingsSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Mappings sheet missing, run setupQuizSheets()' });
-  var mappings = data.mappings || {};
+  let mappings = data.mappings || {};
   if (sheet.getLastRow() > 1) {
     sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).clearContent();
   }
-  var rows = [];
+  let rows = [];
   Object.keys(mappings).forEach(function(qid){
-    var answers = mappings[qid] || {};
+    let answers = mappings[qid] || {};
     Object.keys(answers).forEach(function(aid){
-      var cats = answers[aid] || [];
-      var catsStr = Array.isArray(cats) ? cats.join(',') : String(cats || '');
+      let cats = answers[aid] || [];
+      let catsStr = Array.isArray(cats) ? cats.join(',') : String(cats || '');
       rows.push([qid, aid, catsStr]);
     });
   });
@@ -161,15 +161,15 @@ function handleSaveMappings(data) {
 }
 
 function handlePaddleSearch(data) {
-  var query = String(data.query || '').trim().toLowerCase();
+  let query = String(data.query || '').trim().toLowerCase();
   if (query.length < 2) return jsonResponse({ success: true, results: [] });
-  var sheet = getPaddlesSheet();
+  let sheet = getPaddlesSheet();
   if (!sheet) return jsonResponse({ success: true, results: [] });
-  var values = sheet.getDataRange().getValues();
-  var results = [];
-  for (var i = 1; i < values.length && results.length < 10; i++) {
+  let values = sheet.getDataRange().getValues();
+  let results = [];
+  for (let i = 1; i < values.length && results.length < 10; i++) {
     if (!values[i][0]) continue;
-    var name = String(values[i][1] || '').toLowerCase();
+    let name = String(values[i][1] || '').toLowerCase();
     if (name.indexOf(query) !== -1) {
       results.push({ id: values[i][0], name: values[i][1], image_url: values[i][2] });
     }
@@ -178,41 +178,41 @@ function handlePaddleSearch(data) {
 }
 
 function runMatching(answers) {
-  var mappings = loadMappings();
-  var paddlesSheet = getPaddlesSheet();
+  let mappings = loadMappings();
+  let paddlesSheet = getPaddlesSheet();
   if (!paddlesSheet) return { paddles: [], duprMin: 0, duprMax: 7, budgetMax: 99999 };
 
-  var values = paddlesSheet.getDataRange().getValues();
-  var allPaddles = [];
-  for (var i = 1; i < values.length; i++) {
+  let values = paddlesSheet.getDataRange().getValues();
+  let allPaddles = [];
+  for (let i = 1; i < values.length; i++) {
     if (!values[i][0]) continue;
-    var p = paddleRowToObject(values[i]);
+    let p = paddleRowToObject(values[i]);
     if (!p.active) continue;
     allPaddles.push(p);
   }
 
   // Apply DUPR filter from Q5
-  var duprMin = 0, duprMax = 7;
-  var q5Answer = answers.q5;
+  let duprMin = 0, duprMax = 7;
+  let q5Answer = answers.q5;
   if (q5Answer) {
-    var q5Def = findAnswerInQuestions('q5', q5Answer);
+    let q5Def = findAnswerInQuestions('q5', q5Answer);
     if (q5Def && typeof q5Def.duprMin === 'number') duprMin = q5Def.duprMin;
     if (q5Def && typeof q5Def.duprMax === 'number') duprMax = q5Def.duprMax;
   }
 
-  var budgetMax = 99999;
-  var q31Answer = answers.q31;
+  let budgetMax = 99999;
+  let q31Answer = answers.q31;
   if (q31Answer) {
-    var q31Def = findAnswerInQuestions('q31', q31Answer);
+    let q31Def = findAnswerInQuestions('q31', q31Answer);
     if (q31Def && typeof q31Def.budgetMax === 'number') budgetMax = q31Def.budgetMax;
   }
 
-  var filtered = allPaddles.filter(function(p){
-    var price = Number(p.price) || 0;
+  let filtered = allPaddles.filter(function(p){
+    let price = Number(p.price) || 0;
     if (price > 0 && price > budgetMax) return false;
     if (p.skill_tiers && p.skill_tiers.length > 0) {
-      var paddleMatchesDupr = p.skill_tiers.some(function(tier){
-        var n = parseDuprTier(tier);
+      let paddleMatchesDupr = p.skill_tiers.some(function(tier){
+        let n = parseDuprTier(tier);
         if (n === null) return true;
         return n >= duprMin && n <= duprMax;
       });
@@ -221,13 +221,13 @@ function runMatching(answers) {
     return true;
   });
 
-  var filtersRelaxed = false;
+  let filtersRelaxed = false;
   if (filtered.length === 0 && allPaddles.length > 0) {
     filtered = allPaddles.slice();
     filtersRelaxed = true;
   }
 
-  var paddleCats = {};
+  let paddleCats = {};
   filtered.forEach(function(p){
     paddleCats[p.id] = {};
     (p.categories || []).forEach(function(c){
@@ -235,15 +235,15 @@ function runMatching(answers) {
     });
   });
 
-  var scores = {};
+  let scores = {};
   filtered.forEach(function(p){ scores[p.id] = 0; });
 
   Object.keys(answers).forEach(function(qid){
-    var answer = answers[qid];
+    let answer = answers[qid];
 
-    var isSlider = (typeof answer === 'number');
-    var multiplier;
-    var answerIds;
+    let isSlider = (typeof answer === 'number');
+    let multiplier;
+    let answerIds;
 
     if (isSlider) {
       multiplier = sliderMultiplier(answer);
@@ -258,9 +258,9 @@ function runMatching(answers) {
     }
 
     answerIds.forEach(function(aid){
-      var cats = (mappings[qid] && mappings[qid][aid]) || [];
+      let cats = (mappings[qid] && mappings[qid][aid]) || [];
       cats.forEach(function(cat){
-        var catLower = String(cat).toLowerCase();
+        let catLower = String(cat).toLowerCase();
         if (isBaseCategory(cat)) {
           filtered.forEach(function(p){
             scores[p.id] += paddleBaseScore(p, cat) * multiplier;
@@ -275,13 +275,13 @@ function runMatching(answers) {
   });
 
   filtered.sort(function(a, b){
-    var sa = scores[a.id] || 0;
-    var sb = scores[b.id] || 0;
+    let sa = scores[a.id] || 0;
+    let sb = scores[b.id] || 0;
     if (sb !== sa) return sb - sa;
     return String(a.name).localeCompare(String(b.name));
   });
 
-  var top = filtered.slice(0, 3).map(function(p){
+  let top = filtered.slice(0, 3).map(function(p){
     return {
       id: p.id,
       name: p.name,
@@ -300,7 +300,7 @@ function runMatching(answers) {
   });
 
   function clamp15(v) { return Math.max(1, Math.min(5, parseInt(v, 10) || 3)); }
-  var profile = {
+  let profile = {
     Power:   clamp15(answers.q14),
     Control: clamp15(answers.q15),
     Spin:    clamp15(answers.q13)
@@ -318,13 +318,13 @@ function runMatching(answers) {
 
 function parseDuprTier(tier) {
   if (!tier) return null;
-  var s = String(tier).trim();
+  let s = String(tier).trim();
   if (/beginner/i.test(s)) return 2.5;
-  var n = parseFloat(s);
+  let n = parseFloat(s);
   return isNaN(n) ? null : n;
 }
 
-var FILTER_ANSWERS = {
+const FILTER_ANSWERS = {
   'q5_beginner': { duprMin: 0, duprMax: 2.9 },
   'q5_30':       { duprMin: 2.8, duprMax: 3.4 },
   'q5_35':       { duprMin: 3.3, duprMax: 3.9 },
@@ -348,20 +348,20 @@ function handleListFilters(data) {
 }
 
 function handleSubmitQuiz(data) {
-  var answers = data.answers || {};
-  var email = String(data.email || '').trim().toLowerCase();
-  var userAgent = String(data.userAgent || '');
-  var referrer = String(data.referrer || '');
+  let answers = data.answers || {};
+  let email = String(data.email || '').trim().toLowerCase();
+  let userAgent = String(data.userAgent || '');
+  let referrer = String(data.referrer || '');
 
-  var result = runMatching(answers);
+  let result = runMatching(answers);
 
-  var id = Utilities.getUuid();
-  var now = new Date();
-  var paddleSummary = result.paddles.map(function(p){
+  let id = Utilities.getUuid();
+  let now = new Date();
+  let paddleSummary = result.paddles.map(function(p){
     return { id: p.id, name: p.name, score: p.score };
   });
 
-  var completions = getCompletionsSheet();
+  let completions = getCompletionsSheet();
   if (completions) {
     completions.appendRow([
       id,
@@ -379,11 +379,11 @@ function handleSubmitQuiz(data) {
   }
 
   if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    var subs = getSubscribersSheet();
+    let subs = getSubscribersSheet();
     if (subs) {
-      var existing = subs.getDataRange().getValues();
-      var found = false;
-      for (var i = 1; i < existing.length; i++) {
+      let existing = subs.getDataRange().getValues();
+      let found = false;
+      for (let i = 1; i < existing.length; i++) {
         if (String(existing[i][1]).toLowerCase() === email) { found = true; break; }
       }
       if (!found) subs.appendRow([now, email, 'quiz']);
@@ -400,15 +400,15 @@ function handleSubmitQuiz(data) {
 }
 
 function handleListEvents(data) {
-  var completions = getCompletionsSheet();
+  let completions = getCompletionsSheet();
   if (!completions) return jsonResponse({ success: false, error: 'Completions sheet missing' });
-  var clicks = getClicksSheet();
+  let clicks = getClicksSheet();
 
-  var clicksByCompletion = {};
+  let clicksByCompletion = {};
   if (clicks) {
-    var cvals = clicks.getDataRange().getValues();
-    for (var i = 1; i < cvals.length; i++) {
-      var compId = String(cvals[i][2] || '').trim();
+    let cvals = clicks.getDataRange().getValues();
+    for (let i = 1; i < cvals.length; i++) {
+      let compId = String(cvals[i][2] || '').trim();
       if (!compId) continue;
       if (!clicksByCompletion[compId]) clicksByCompletion[compId] = [];
       clicksByCompletion[compId].push({
@@ -419,11 +419,11 @@ function handleListEvents(data) {
     }
   }
 
-  var publicUrl = getQuizPublicUrl();
-  var rows = completions.getDataRange().getValues();
-  var events = [];
-  for (var j = 1; j < rows.length; j++) {
-    var id = String(rows[j][0] || '').trim();
+  let publicUrl = getQuizPublicUrl();
+  let rows = completions.getDataRange().getValues();
+  let events = [];
+  for (let j = 1; j < rows.length; j++) {
+    let id = String(rows[j][0] || '').trim();
     if (!id) continue;
     events.push({
       id: id,
@@ -435,13 +435,13 @@ function handleListEvents(data) {
   }
   events.sort(function(a, b){ return new Date(b.timestamp) - new Date(a.timestamp); });
 
-  var page = parseInt(data.page, 10) || 1;
-  var pageSize = parseInt(data.pageSize, 10) || 25;
-  var total = events.length;
-  var totalPages = Math.max(1, Math.ceil(total / pageSize));
+  let page = parseInt(data.page, 10) || 1;
+  let pageSize = parseInt(data.pageSize, 10) || 25;
+  let total = events.length;
+  let totalPages = Math.max(1, Math.ceil(total / pageSize));
   if (page > totalPages) page = totalPages;
-  var start = (page - 1) * pageSize;
-  var pageEvents = events.slice(start, start + pageSize);
+  let start = (page - 1) * pageSize;
+  let pageEvents = events.slice(start, start + pageSize);
 
   return jsonResponse({
     success: true,
@@ -453,35 +453,35 @@ function handleListEvents(data) {
 }
 
 function handleListSubscribersWithResults(data) {
-  var subs = getSubscribersSheet();
+  let subs = getSubscribersSheet();
   if (!subs) return jsonResponse({ success: false, error: 'Subscribers sheet missing' });
-  var completions = getCompletionsSheet();
+  let completions = getCompletionsSheet();
 
-  var emailToId = {};
+  let emailToId = {};
   if (completions) {
-    var cvals = completions.getDataRange().getValues();
-    for (var i = 1; i < cvals.length; i++) {
-      var cid = String(cvals[i][0] || '').trim();
-      var cemail = String(cvals[i][2] || '').trim().toLowerCase();
-      var ctime = cvals[i][1];
+    let cvals = completions.getDataRange().getValues();
+    for (let i = 1; i < cvals.length; i++) {
+      let cid = String(cvals[i][0] || '').trim();
+      let cemail = String(cvals[i][2] || '').trim().toLowerCase();
+      let ctime = cvals[i][1];
       if (!cid || !cemail) continue;
-      var prior = emailToId[cemail];
+      let prior = emailToId[cemail];
       if (!prior || (ctime && (!prior.ts || new Date(ctime) > new Date(prior.ts)))) {
         emailToId[cemail] = { id: cid, ts: ctime };
       }
     }
   }
 
-  var publicUrl = getQuizPublicUrl();
-  var svals = subs.getDataRange().getValues();
-  var search = String(data.search || '').trim().toLowerCase();
-  var rows = [];
-  for (var j = 1; j < svals.length; j++) {
-    var email = String(svals[j][1] || '').trim().toLowerCase();
+  let publicUrl = getQuizPublicUrl();
+  let svals = subs.getDataRange().getValues();
+  let search = String(data.search || '').trim().toLowerCase();
+  let rows = [];
+  for (let j = 1; j < svals.length; j++) {
+    let email = String(svals[j][1] || '').trim().toLowerCase();
     if (!email) continue;
     if (search && email.indexOf(search) === -1) continue;
-    var match = emailToId[email];
-    var resultUrl = (match && publicUrl) ? (publicUrl + '/?r=' + encodeURIComponent(match.id)) : '';
+    let match = emailToId[email];
+    let resultUrl = (match && publicUrl) ? (publicUrl + '/?r=' + encodeURIComponent(match.id)) : '';
     rows.push({
       timestamp: svals[j][0],
       email: svals[j][1],
@@ -492,13 +492,13 @@ function handleListSubscribersWithResults(data) {
   }
   rows.sort(function(a, b){ return new Date(b.timestamp) - new Date(a.timestamp); });
 
-  var page = parseInt(data.page, 10) || 1;
-  var pageSize = parseInt(data.pageSize, 10) || 20;
-  var total = rows.length;
-  var totalPages = Math.max(1, Math.ceil(total / pageSize));
+  let page = parseInt(data.page, 10) || 1;
+  let pageSize = parseInt(data.pageSize, 10) || 20;
+  let total = rows.length;
+  let totalPages = Math.max(1, Math.ceil(total / pageSize));
   if (page > totalPages) page = totalPages;
-  var start = (page - 1) * pageSize;
-  var pageRows = rows.slice(start, start + pageSize);
+  let start = (page - 1) * pageSize;
+  let pageRows = rows.slice(start, start + pageSize);
 
   return jsonResponse({
     success: true,
@@ -510,26 +510,26 @@ function handleListSubscribersWithResults(data) {
 }
 
 function handleAttachEmail(data) {
-  var id = String(data.id || '').trim();
-  var email = String(data.email || '').trim().toLowerCase();
+  let id = String(data.id || '').trim();
+  let email = String(data.email || '').trim().toLowerCase();
   if (!id) return jsonResponse({ success: false, error: 'Result id required' });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return jsonResponse({ success: false, error: 'Please enter a valid email' });
   }
 
-  var sheet = getCompletionsSheet();
+  let sheet = getCompletionsSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Completions sheet missing' });
-  var values = sheet.getDataRange().getValues();
-  for (var i = 1; i < values.length; i++) {
+  let values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
     if (String(values[i][0]).trim() === id) {
       sheet.getRange(i + 1, 3).setValue(email);
       SpreadsheetApp.flush();
 
-      var subs = getSubscribersSheet();
+      let subs = getSubscribersSheet();
       if (subs) {
-        var existing = subs.getDataRange().getValues();
-        var found = false;
-        for (var j = 1; j < existing.length; j++) {
+        let existing = subs.getDataRange().getValues();
+        let found = false;
+        for (let j = 1; j < existing.length; j++) {
           if (String(existing[j][1]).toLowerCase() === email) { found = true; break; }
         }
         if (!found) subs.appendRow([new Date(), email, 'quiz']);
@@ -546,18 +546,18 @@ function handleAttachEmail(data) {
 }
 
 function sendResultsEmail(toEmail, completionId) {
-  var props = PropertiesService.getScriptProperties();
-  var apiKey = props.getProperty('RESEND_API_KEY');
+  let props = PropertiesService.getScriptProperties();
+  let apiKey = props.getProperty('RESEND_API_KEY');
   if (!apiKey) { Logger.log('RESEND_API_KEY missing'); return false; }
 
-  var fromEmail = props.getProperty('FROM_EMAIL') || 'ben@bepickleballer.com';
-  var fromName = props.getProperty('FROM_NAME') || 'BePickleballer';
-  var fromAddr = fromName + ' <' + fromEmail + '>';
+  let fromEmail = props.getProperty('FROM_EMAIL') || 'ben@bepickleballer.com';
+  let fromName = props.getProperty('FROM_NAME') || 'BePickleballer';
+  let fromAddr = fromName + ' <' + fromEmail + '>';
 
-  var html = buildResultsEmailHtml(completionId);
+  let html = buildResultsEmailHtml(completionId);
 
   try {
-    var resp = UrlFetchApp.fetch('https://api.resend.com/emails', {
+    let resp = UrlFetchApp.fetch('https://api.resend.com/emails', {
       method: 'post',
       contentType: 'application/json',
       headers: { 'Authorization': 'Bearer ' + apiKey },
@@ -569,7 +569,7 @@ function sendResultsEmail(toEmail, completionId) {
       }),
       muteHttpExceptions: true
     });
-    var code = resp.getResponseCode();
+    let code = resp.getResponseCode();
     return code >= 200 && code < 300;
   } catch (err) {
     return false;
@@ -577,24 +577,24 @@ function sendResultsEmail(toEmail, completionId) {
 }
 
 function buildResultsEmailHtml(completionId) {
-  var publicUrl = getQuizPublicUrl();
-  var resultsLink = publicUrl ? (publicUrl + '/?r=' + encodeURIComponent(completionId)) : '';
+  let publicUrl = getQuizPublicUrl();
+  let resultsLink = publicUrl ? (publicUrl + '/?r=' + encodeURIComponent(completionId)) : '';
 
-  var discountDbUrl = PropertiesService.getScriptProperties().getProperty('DISCOUNT_DB_URL') || '';
+  let discountDbUrl = PropertiesService.getScriptProperties().getProperty('DISCOUNT_DB_URL') || '';
 
-  var brand = '#0891b2';
-  var dark = '#0f172a';
-  var slate = '#475569';
+  let brand = '#0891b2';
+  let dark = '#0f172a';
+  let slate = '#475569';
 
-  var resultsLine = resultsLink
+  let resultsLine = resultsLink
     ? 'Here are the results: <a href="' + escapeHtmlServer(resultsLink) + '" style="color:' + brand + ';">Your Results</a>'
     : 'Here are the results: Your Results';
 
-  var discountLine = discountDbUrl
+  let discountLine = discountDbUrl
     ? 'Here’s the access to my pickleball paddle discount codes database: <a href="' + escapeHtmlServer(discountDbUrl) + '" style="color:' + brand + ';">Discount Code Database</a>'
     : '';
 
-  var p = function(text){
+  let p = function(text){
     return '<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:' + dark + ';">' + text + '</p>';
   };
 
@@ -618,18 +618,18 @@ function escapeHtmlServer(s) {
 }
 
 function handleGetResult(data) {
-  var id = String(data.id || '').trim();
+  let id = String(data.id || '').trim();
   if (!id) return jsonResponse({ success: false, error: 'Result id required' });
 
-  var sheet = getCompletionsSheet();
+  let sheet = getCompletionsSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Completions sheet missing' });
-  var values = sheet.getDataRange().getValues();
-  for (var i = 1; i < values.length; i++) {
+  let values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
-      var answers = {};
+      let answers = {};
       try { answers = JSON.parse(values[i][6] || '{}'); } catch (err) {}
-      var result = runMatching(answers);
-      var profile = {};
+      let result = runMatching(answers);
+      let profile = {};
       try { profile = JSON.parse(values[i][8] || '{}'); } catch (err) {}
       return jsonResponse({
         success: true,
@@ -647,7 +647,7 @@ function handleGetResult(data) {
 }
 
 function handleTrackClick(data) {
-  var sheet = getClicksSheet();
+  let sheet = getClicksSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Clicks sheet missing' });
   sheet.appendRow([
     Utilities.getUuid(),

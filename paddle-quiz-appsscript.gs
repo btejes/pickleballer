@@ -1,20 +1,20 @@
 function setupPaddleSheets() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  let ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  var paddles = ss.getSheetByName('Paddles');
+  let paddles = ss.getSheetByName('Paddles');
   if (!paddles) {
     paddles = ss.insertSheet('Paddles');
-    var paddleHeaders = ['id','name','image_url','affiliate_url','discount_code','discount_percent','price','msrp','power_score','control_score','spin_score','skill_tiers','categories','description','active','created_at','updated_at'];
+    let paddleHeaders = ['id','name','image_url','affiliate_url','discount_code','discount_percent','price','msrp','power_score','control_score','spin_score','skill_tiers','categories','description','active','created_at','updated_at'];
     paddles.getRange(1, 1, 1, paddleHeaders.length).setValues([paddleHeaders]);
     paddles.getRange(1, 1, 1, paddleHeaders.length).setFontWeight('bold').setBackground('#f1f5f9');
     paddles.setFrozenRows(1);
     paddles.setColumnWidths(1, paddleHeaders.length, 140);
   }
 
-  var categories = ss.getSheetByName('Categories');
+  let categories = ss.getSheetByName('Categories');
   if (!categories) {
     categories = ss.insertSheet('Categories');
-    var categoryHeaders = ['id','name','created_at'];
+    let categoryHeaders = ['id','name','created_at'];
     categories.getRange(1, 1, 1, categoryHeaders.length).setValues([categoryHeaders]);
     categories.getRange(1, 1, 1, categoryHeaders.length).setFontWeight('bold').setBackground('#f1f5f9');
     categories.setFrozenRows(1);
@@ -81,38 +81,38 @@ function paddlePayloadToRow(id, data, createdAt) {
 }
 
 function handleListPaddles(data) {
-  var sheet = getPaddlesSheet();
+  let sheet = getPaddlesSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Paddles sheet missing, run setupPaddleSheets()' });
-  var values = sheet.getDataRange().getValues();
-  var paddles = [];
-  for (var i = 1; i < values.length; i++) {
+  let values = sheet.getDataRange().getValues();
+  let paddles = [];
+  for (let i = 1; i < values.length; i++) {
     if (values[i][0]) paddles.push(paddleRowToObject(values[i]));
   }
   return jsonResponse({ success: true, paddles: paddles });
 }
 
 function handleAddPaddle(data) {
-  var sheet = getPaddlesSheet();
+  let sheet = getPaddlesSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Paddles sheet missing, run setupPaddleSheets()' });
-  var name = String(data.name || '').trim();
+  let name = String(data.name || '').trim();
   if (!name) return jsonResponse({ success: false, error: 'Name required' });
-  var id = generateId();
-  var row = paddlePayloadToRow(id, data, new Date());
+  let id = generateId();
+  let row = paddlePayloadToRow(id, data, new Date());
   sheet.appendRow(row);
   return jsonResponse({ success: true, id: id });
 }
 
 function handleUpdatePaddle(data) {
-  var sheet = getPaddlesSheet();
+  let sheet = getPaddlesSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Paddles sheet missing' });
-  var id = String(data.id || '').trim();
+  let id = String(data.id || '').trim();
   if (!id) return jsonResponse({ success: false, error: 'ID required' });
-  var values = sheet.getDataRange().getValues();
-  for (var i = 1; i < values.length; i++) {
+  let values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
-      var existing = paddleRowToObject(values[i]);
-      var merged = Object.assign({}, existing, data);
-      var row = paddlePayloadToRow(id, merged, existing.created_at || new Date());
+      let existing = paddleRowToObject(values[i]);
+      let merged = Object.assign({}, existing, data);
+      let row = paddlePayloadToRow(id, merged, existing.created_at || new Date());
       sheet.getRange(i + 1, 1, 1, row.length).setValues([row]);
       return jsonResponse({ success: true });
     }
@@ -121,12 +121,12 @@ function handleUpdatePaddle(data) {
 }
 
 function handleDeletePaddle(data) {
-  var sheet = getPaddlesSheet();
+  let sheet = getPaddlesSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Paddles sheet missing' });
-  var id = String(data.id || '').trim();
+  let id = String(data.id || '').trim();
   if (!id) return jsonResponse({ success: false, error: 'ID required' });
-  var values = sheet.getDataRange().getValues();
-  for (var i = values.length - 1; i >= 1; i--) {
+  let values = sheet.getDataRange().getValues();
+  for (let i = values.length - 1; i >= 1; i--) {
     if (values[i][0] === id) {
       sheet.deleteRow(i + 1);
       return jsonResponse({ success: true });
@@ -136,11 +136,11 @@ function handleDeletePaddle(data) {
 }
 
 function handleListCategories(data) {
-  var sheet = getCategoriesSheet();
+  let sheet = getCategoriesSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Categories sheet missing, run setupPaddleSheets()' });
-  var values = sheet.getDataRange().getValues();
-  var categories = [];
-  for (var i = 1; i < values.length; i++) {
+  let values = sheet.getDataRange().getValues();
+  let categories = [];
+  for (let i = 1; i < values.length; i++) {
     if (values[i][0]) {
       categories.push({ id: values[i][0], name: values[i][1], created_at: values[i][2] });
     }
@@ -150,29 +150,29 @@ function handleListCategories(data) {
 }
 
 function handleAddCategory(data) {
-  var sheet = getCategoriesSheet();
+  let sheet = getCategoriesSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Categories sheet missing' });
-  var name = String(data.name || '').trim();
+  let name = String(data.name || '').trim();
   if (!name) return jsonResponse({ success: false, error: 'Name required' });
-  var values = sheet.getDataRange().getValues();
-  for (var i = 1; i < values.length; i++) {
+  let values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
     if (String(values[i][1]).toLowerCase() === name.toLowerCase()) {
       return jsonResponse({ success: false, error: 'Category already exists' });
     }
   }
-  var id = generateId();
+  let id = generateId();
   sheet.appendRow([id, name, new Date()]);
   return jsonResponse({ success: true, id: id });
 }
 
 function handleUpdateCategory(data) {
-  var sheet = getCategoriesSheet();
+  let sheet = getCategoriesSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Categories sheet missing' });
-  var id = String(data.id || '').trim();
-  var newName = String(data.name || '').trim();
+  let id = String(data.id || '').trim();
+  let newName = String(data.name || '').trim();
   if (!id || !newName) return jsonResponse({ success: false, error: 'ID and name required' });
-  var values = sheet.getDataRange().getValues();
-  for (var i = 1; i < values.length; i++) {
+  let values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
       sheet.getRange(i + 1, 2).setValue(newName);
       return jsonResponse({ success: true });
@@ -182,12 +182,12 @@ function handleUpdateCategory(data) {
 }
 
 function handleDeleteCategory(data) {
-  var sheet = getCategoriesSheet();
+  let sheet = getCategoriesSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Categories sheet missing' });
-  var id = String(data.id || '').trim();
+  let id = String(data.id || '').trim();
   if (!id) return jsonResponse({ success: false, error: 'ID required' });
-  var values = sheet.getDataRange().getValues();
-  for (var i = values.length - 1; i >= 1; i--) {
+  let values = sheet.getDataRange().getValues();
+  for (let i = values.length - 1; i >= 1; i--) {
     if (values[i][0] === id) {
       sheet.deleteRow(i + 1);
       return jsonResponse({ success: true });

@@ -1,28 +1,28 @@
 // Category CRUD. Uses window.bpAdmin from app.js.
 
 window.bpAdminCategories = (function(){
-  var api = window.bpAdmin.api;
-  var showToast = window.bpAdmin.showToast;
-  var withSpinner = window.bpAdmin.withSpinner;
-  var spinnerSvg = window.bpAdmin.spinnerSvg;
+  let api = window.bpAdmin.api;
+  let showToast = window.bpAdmin.showToast;
+  let withSpinner = window.bpAdmin.withSpinner;
+  const spinnerSvg = window.bpAdmin.spinnerSvg;
 
-  var BASE_CATEGORIES = ['Power', 'Control', 'Spin'];
+  let BASE_CATEGORIES = ['Power', 'Control', 'Spin'];
   function isBase(name) {
-    var n = String(name || '').trim().toLowerCase();
+    let n = String(name || '').trim().toLowerCase();
     return BASE_CATEGORIES.some(function(b){ return b.toLowerCase() === n; });
   }
 
-  var addBtn = document.getElementById('bp-category-add-btn');
-  var newInput = document.getElementById('bp-new-category');
-  var listEl = document.getElementById('bp-category-list');
-  var countEl = document.getElementById('bp-category-count');
+  let addBtn = document.getElementById('bp-category-add-btn');
+  let newInput = document.getElementById('bp-new-category');
+  let listEl = document.getElementById('bp-category-list');
+  let countEl = document.getElementById('bp-category-count');
 
-  var cached = [];
+  let cached = [];
 
   function getCategories() { return cached.slice(); }
 
-  var trashSvg = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/></svg>';
-  var pencilSvg = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>';
+  const trashSvg = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/></svg>';
+  const pencilSvg = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>';
 
   function loadCategories(silent) {
     if (!silent) {
@@ -49,41 +49,41 @@ window.bpAdminCategories = (function(){
     }
     listEl.innerHTML = '';
     // Sort base categories first
-    var sorted = cached.slice().sort(function(a, b){
-      var ab = isBase(a.name) ? 0 : 1;
-      var bb = isBase(b.name) ? 0 : 1;
+    let sorted = cached.slice().sort(function(a, b){
+      let ab = isBase(a.name) ? 0 : 1;
+      let bb = isBase(b.name) ? 0 : 1;
       if (ab !== bb) return ab - bb;
       return String(a.name).toLowerCase().localeCompare(String(b.name).toLowerCase());
     });
     sorted.forEach(function(cat){
-      var base = isBase(cat.name);
-      var chip = document.createElement('div');
+      let base = isBase(cat.name);
+      let chip = document.createElement('div');
       chip.className = 'bp-category-chip group inline-flex items-center gap-2 pl-3.5 pr-3 py-1.5 rounded-full text-sm font-medium transition ' +
         (base
           ? 'bg-slate-100 border border-slate-300 text-slate-800'
           : 'bg-brand-50 border border-brand-100 text-brand-800 hover:border-brand-300 hover:bg-brand-100 pr-1.5');
 
-      var nameSpan = document.createElement('span');
+      let nameSpan = document.createElement('span');
       nameSpan.textContent = cat.name;
       chip.appendChild(nameSpan);
 
       if (base) {
-        var lock = document.createElement('span');
+        let lock = document.createElement('span');
         lock.className = 'inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-slate-500 bg-white border border-slate-200 rounded-full px-1.5 py-0.5';
         lock.innerHTML = '<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 11c0-1.105.895-2 2-2s2 .895 2 2v2H8v-2c0-2.21 1.79-4 4-4s4 1.79 4 4M5 13h14v8H5z"/></svg>Base';
         lock.title = 'This category is built in and tied to a paddle performance score.';
         chip.appendChild(lock);
       } else {
-        var actions = document.createElement('div');
+        let actions = document.createElement('div');
         actions.className = 'flex items-center gap-0.5';
 
-        var editBtn = document.createElement('button');
+        let editBtn = document.createElement('button');
         editBtn.className = 'text-brand-700/50 hover:text-brand-700 hover:bg-white rounded-full w-6 h-6 flex items-center justify-center transition';
         editBtn.title = 'Rename';
         editBtn.innerHTML = pencilSvg;
         editBtn.addEventListener('click', function(e){
           e.stopPropagation();
-          var newName = prompt('Rename category:', cat.name);
+          let newName = prompt('Rename category:', cat.name);
           if (!newName || newName.trim() === '' || newName.trim() === cat.name) return;
           if (isBase(newName.trim())) { showToast('That name is reserved for a built-in category'); return; }
           api('update_category', { id: cat.id, name: newName.trim() }).then(function(r){
@@ -92,7 +92,7 @@ window.bpAdminCategories = (function(){
           });
         });
 
-        var delBtn = document.createElement('button');
+        let delBtn = document.createElement('button');
         delBtn.className = 'text-brand-700/50 hover:text-red-600 hover:bg-white rounded-full w-6 h-6 flex items-center justify-center transition';
         delBtn.title = 'Delete';
         delBtn.innerHTML = trashSvg;
@@ -116,7 +116,7 @@ window.bpAdminCategories = (function(){
   }
 
   addBtn.addEventListener('click', function(){
-    var name = newInput.value.trim();
+    let name = newInput.value.trim();
     if (!name) return;
     if (isBase(name)) { showToast('That name is reserved for a built-in category'); return; }
     withSpinner(addBtn, 'Adding...', function(){

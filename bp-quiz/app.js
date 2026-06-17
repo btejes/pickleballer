@@ -1,9 +1,10 @@
 window.bpQuiz = (function(){
-  var BACKEND_URL = 'https://script.google.com/macros/s/AKfycbz6R0VAaTHsdqXZmx87wJCLhQrwYfLVW42QGaH4FMKu-wdz50MnPdD-R6ZIE-SK6KdJ/exec';
-  var STORAGE_KEY = 'bp_quiz_state_v1';
+  const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbz6R0VAaTHsdqXZmx87wJCLhQrwYfLVW42QGaH4FMKu-wdz50MnPdD-R6ZIE-SK6KdJ/exec';
+  const STORAGE_KEY = 'bp_quiz_state_v1';
+  const PARENT_ORIGIN = 'https://bepickleballer.com';
 
   function api(action, extra) {
-    var payload = Object.assign({ action: action }, extra || {});
+    let payload = Object.assign({ action: action }, extra || {});
     return fetch(BACKEND_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -13,7 +14,7 @@ window.bpQuiz = (function(){
 
   function loadState() {
     try {
-      var raw = localStorage.getItem(STORAGE_KEY);
+      let raw = localStorage.getItem(STORAGE_KEY);
       if (raw) return JSON.parse(raw);
     } catch (err) {}
     return { currentIndex: 0, answers: {}, currentPaddleName: '' };
@@ -31,10 +32,10 @@ window.bpQuiz = (function(){
 
   function getResultIdFromUrl() {
     try {
-      var params = new URLSearchParams(window.location.search);
-      var id = (params.get('r') || '').trim();
+      let params = new URLSearchParams(window.location.search);
+      let id = (params.get('r') || '').trim();
       if (id) return id;
-      var match = window.location.pathname.match(/\/results\/([A-Za-z0-9_-]+)/);
+      let match = window.location.pathname.match(/\/results\/([A-Za-z0-9_-]+)/);
       if (match) return match[1];
     } catch (err) {}
     return '';
@@ -43,33 +44,33 @@ window.bpQuiz = (function(){
   function setResultIdInUrl(id) {
     if (!id) return;
     try {
-      var url = new URL(window.location.href);
+      let url = new URL(window.location.href);
       url.searchParams.set('r', id);
       window.history.replaceState({}, '', url.toString());
     } catch (err) {}
     if (window.parent !== window) {
       try {
-        window.parent.postMessage({ type: 'bp-quiz-result-id', id: id }, '*');
+        window.parent.postMessage({ type: 'bp-quiz-result-id', id: id }, PARENT_ORIGIN);
       } catch (err) {}
     }
   }
 
-  var lastReportedHeight = 0;
+  let lastReportedHeight = 0;
   function measureContentHeight() {
-    var el = document.getElementById('bp-quiz-app');
+    let el = document.getElementById('bp-quiz-app');
     if (el) {
-      var rect = el.getBoundingClientRect();
+      let rect = el.getBoundingClientRect();
       return Math.ceil(rect.height);
     }
     return document.body ? document.body.scrollHeight : 0;
   }
   function postHeightToParent() {
     if (window.parent === window) return;
-    var h = measureContentHeight();
+    let h = measureContentHeight();
     if (!h || Math.abs(h - lastReportedHeight) < 2) return;
     lastReportedHeight = h;
     try {
-      window.parent.postMessage({ type: 'bp-quiz-height', height: h }, '*');
+      window.parent.postMessage({ type: 'bp-quiz-height', height: h }, PARENT_ORIGIN);
     } catch (err) {}
   }
 
@@ -77,8 +78,8 @@ window.bpQuiz = (function(){
     function attachObserver(){
       if (typeof ResizeObserver === 'undefined') return;
       try {
-        var ro = new ResizeObserver(function(){ postHeightToParent(); });
-        var target = document.getElementById('bp-quiz-app') || document.body;
+        let ro = new ResizeObserver(function(){ postHeightToParent(); });
+        let target = document.getElementById('bp-quiz-app') || document.body;
         if (target) ro.observe(target);
       } catch (err) {}
     }

@@ -1,19 +1,19 @@
 window.bpAdmin = (function(){
-  var BACKEND_URL = "https://script.google.com/macros/s/AKfycbz6R0VAaTHsdqXZmx87wJCLhQrwYfLVW42QGaH4FMKu-wdz50MnPdD-R6ZIE-SK6KdJ/exec";
-  var creds = null;
-  var initHooks = [];
-  var tabHooks = {};
+  const BACKEND_URL = "https://script.google.com/macros/s/AKfycbz6R0VAaTHsdqXZmx87wJCLhQrwYfLVW42QGaH4FMKu-wdz50MnPdD-R6ZIE-SK6KdJ/exec";
+  let creds = null;
+  let initHooks = [];
+  let tabHooks = {};
 
-  var loginBtn = document.getElementById('bp-login-btn');
-  var logoutBtn = document.getElementById('bp-logout-btn');
-  var loginError = document.getElementById('bp-login-error');
-  var usernameInput = document.getElementById('bp-username');
-  var passwordInput = document.getElementById('bp-password');
-  var toastEl = document.getElementById('bp-toast');
-  var toastBody = document.getElementById('bp-toast-body');
-  var toastTimeout;
+  let loginBtn = document.getElementById('bp-login-btn');
+  let logoutBtn = document.getElementById('bp-logout-btn');
+  let loginError = document.getElementById('bp-login-error');
+  let usernameInput = document.getElementById('bp-username');
+  let passwordInput = document.getElementById('bp-password');
+  let toastEl = document.getElementById('bp-toast');
+  let toastBody = document.getElementById('bp-toast-body');
+  let toastTimeout;
 
-  var spinnerSvg = '<svg class="w-4 h-4 animate-spin shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+  const spinnerSvg = '<svg class="w-4 h-4 animate-spin shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
 
   function showToast(msg) {
     toastBody.textContent = msg;
@@ -23,7 +23,7 @@ window.bpAdmin = (function(){
   }
 
   function api(action, extra) {
-    var payload = Object.assign({ action: action }, creds || {}, extra || {});
+    let payload = Object.assign({ action: action }, creds || {}, extra || {});
     return fetch(BACKEND_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -32,7 +32,7 @@ window.bpAdmin = (function(){
   }
 
   function withSpinner(btn, label, fn) {
-    var orig = btn.innerHTML;
+    let orig = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = spinnerSvg + '<span>' + (label || 'Working...') + '</span>';
     return fn().finally(function(){ btn.disabled = false; btn.innerHTML = orig; });
@@ -49,11 +49,11 @@ window.bpAdmin = (function(){
 
   // Tab switching
   function activateTab(name) {
-    var contents = document.querySelectorAll('.bp-tab-content');
+    let contents = document.querySelectorAll('.bp-tab-content');
     contents.forEach(function(el){ el.classList.add('hidden'); });
-    var target = document.getElementById('bp-tab-' + name);
+    let target = document.getElementById('bp-tab-' + name);
     if (target) target.classList.remove('hidden');
-    var btns = document.querySelectorAll('.bp-tab-btn');
+    let btns = document.querySelectorAll('.bp-tab-btn');
     btns.forEach(function(b){
       if (b.getAttribute('data-tab') === name) b.classList.add('active');
       else b.classList.remove('active');
@@ -69,8 +69,8 @@ window.bpAdmin = (function(){
   // Login
   loginBtn.addEventListener('click', function(){
     loginError.textContent = '';
-    var u = usernameInput.value.trim();
-    var p = passwordInput.value;
+    let u = usernameInput.value.trim();
+    let p = passwordInput.value;
     if (!u || !p) { loginError.textContent = 'Username and password required'; return; }
     withSpinner(loginBtn, 'Signing in...', function(){
       return api('login', { username: u, password: p }).then(function(r){
@@ -94,7 +94,7 @@ window.bpAdmin = (function(){
   });
 
   // Restore session
-  var saved = localStorage.getItem('bp_admin_creds');
+  let saved = localStorage.getItem('bp_admin_creds');
   if (saved) {
     try {
       creds = JSON.parse(saved);
