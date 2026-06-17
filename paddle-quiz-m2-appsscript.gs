@@ -623,7 +623,7 @@ function sendResultsEmail(toEmail, completionId, paddles, profile) {
       payload: JSON.stringify({
         from: fromAddr,
         to: [toEmail],
-        subject: 'Your Pickleball Paddle Quiz Results',
+        subject: 'Your paddle matches',
         html: html
       }),
       muteHttpExceptions: true
