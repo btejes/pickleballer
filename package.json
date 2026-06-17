@@ -1,0 +1,15 @@
+{
+  "name": "pickleballer",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "npm run build:quiz && npm run build:admin",
+    "build:quiz": "tailwindcss -c bp-quiz/tailwind.config.js -i bp-quiz/tailwind.src.css -o bp-quiz/tailwind.css --minify",
+    "build:admin": "tailwindcss -c bp-admin/tailwind.config.js -i bp-admin/tailwind.src.css -o bp-admin/tailwind.css --minify",
+    "watch:quiz": "tailwindcss -c bp-quiz/tailwind.config.js -i bp-quiz/tailwind.src.css -o bp-quiz/tailwind.css --watch",
+    "watch:admin": "tailwindcss -c bp-admin/tailwind.config.js -i bp-admin/tailwind.src.css -o bp-admin/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  }
+}
