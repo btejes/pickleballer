@@ -234,11 +234,8 @@ function runMatching(answers) {
 
   // Filter paddles
   var filtered = allPaddles.filter(function(p){
-    // Budget check
     var price = Number(p.price) || 0;
     if (price > 0 && price > budgetMax) return false;
-    // DUPR check: paddle.skill_tiers stored as comma-separated list of allowed levels
-    // For V0, if no skill_tiers set, paddle passes; otherwise check overlap with user's range
     if (p.skill_tiers && p.skill_tiers.length > 0) {
       var paddleMatchesDupr = p.skill_tiers.some(function(tier){
         var n = parseDuprTier(tier);
@@ -249,6 +246,14 @@ function runMatching(answers) {
     }
     return true;
   });
+
+  // Fallback: if no paddles passed the hard filters, score the full catalog
+  // instead of returning empty. Set a flag so the UI can tell the user.
+  var filtersRelaxed = false;
+  if (filtered.length === 0 && allPaddles.length > 0) {
+    filtered = allPaddles.slice();
+    filtersRelaxed = true;
+  }
 
   // Score each paddle with the new model:
   //   - Base category (Power/Control/Spin): paddle.match += paddle[dim_score] * multiplier
@@ -350,7 +355,8 @@ function runMatching(answers) {
     duprMin: duprMin,
     duprMax: duprMax,
     budgetMax: budgetMax,
-    profile: profile
+    profile: profile,
+    filtersRelaxed: filtersRelaxed
   };
 }
 
@@ -438,7 +444,8 @@ function handleSubmitQuiz(data) {
     success: true,
     id: id,
     paddles: result.paddles,
-    profile: result.profile
+    profile: result.profile,
+    filtersRelaxed: !!result.filtersRelaxed
   });
 }
 
@@ -701,7 +708,8 @@ function handleGetResult(data) {
         email: values[i][2],
         answers: answers,
         paddles: result.paddles,
-        profile: result.profile
+        profile: result.profile,
+        filtersRelaxed: !!result.filtersRelaxed
       });
     }
   }

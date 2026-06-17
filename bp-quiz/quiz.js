@@ -445,11 +445,19 @@
     matchesHeading.textContent = 'Your Top Paddle Matches';
     doc.appendChild(matchesHeading);
 
+    // --- Filters-relaxed note ---
+    if (r.filtersRelaxed && r.paddles && r.paddles.length > 0) {
+      var note = document.createElement('div');
+      note.className = 'bp-filters-note';
+      note.textContent = 'No paddles fully matched your skill level and budget, so here are the closest picks from our full catalog.';
+      doc.appendChild(note);
+    }
+
     // --- Paddle cards ---
     if (!r.paddles || r.paddles.length === 0) {
       var empty = document.createElement('div');
       empty.className = 'bp-paddle-card text-center text-sm text-slate-500';
-      empty.textContent = 'No paddles matched your filters. Try widening your budget or skill range.';
+      empty.textContent = 'No paddles available right now. Please check back soon.';
       doc.appendChild(empty);
     } else {
       // Compute match % using option A (relative to top score, capped 60-99)

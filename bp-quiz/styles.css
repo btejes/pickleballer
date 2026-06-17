@@ -374,6 +374,17 @@ body { font-family: 'DM Sans', system-ui, sans-serif; }
   background: #cbd5e1;
 }
 
+.bp-filters-note {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  border-radius: 0.625rem;
+  padding: 0.75rem 0.875rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  margin-bottom: 0.875rem;
+}
+
 /* Paddle card */
 .bp-paddle-card {
   position: relative;
