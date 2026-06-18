@@ -22,9 +22,9 @@ function paddleBaseScore(paddle, catName) {
 }
 
 function sliderMultiplier(value) {
-  let v = parseInt(value, 10);
-  if (isNaN(v) || v <= 0 || v > 5) return 0;
-  return v - 3;
+  const v = parseInt(value, 10);
+  if (isNaN(v) || v <= 0 || v > 10) return 0;
+  return (v - 5.5) * 0.4;
 }
 
 function migratePaddleScoresTo1to5() {
@@ -289,6 +289,7 @@ function runMatching(answers) {
       affiliate_url: p.affiliate_url,
       discount_code: p.discount_code,
       discount_percent: p.discount_percent,
+      discount_amount: p.discount_amount,
       price: p.price,
       msrp: p.msrp,
       power_score: p.power_score,
@@ -299,11 +300,11 @@ function runMatching(answers) {
     };
   });
 
-  function clamp15(v) { return Math.max(1, Math.min(5, parseInt(v, 10) || 3)); }
-  let profile = {
-    Power:   clamp15(answers.q14),
-    Control: clamp15(answers.q15),
-    Spin:    clamp15(answers.q13)
+  function clamp110(v) { return Math.max(1, Math.min(10, parseInt(v, 10) || 5)); }
+  const profile = {
+    Power:   clamp110(answers.q14),
+    Control: clamp110(answers.q15),
+    Spin:    clamp110(answers.q13)
   };
 
   return {

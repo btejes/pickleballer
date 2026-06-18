@@ -23,6 +23,7 @@ window.bpAdminPaddles = (function(){
   let urlInput = document.getElementById('bp-paddle-url');
   let codeInput = document.getElementById('bp-paddle-code');
   let percentInput = document.getElementById('bp-paddle-percent');
+  let amountInput = document.getElementById('bp-paddle-amount');
   let priceInput = document.getElementById('bp-paddle-price');
   let msrpInput = document.getElementById('bp-paddle-msrp');
   let powerInput = document.getElementById('bp-paddle-power');
@@ -155,6 +156,7 @@ window.bpAdminPaddles = (function(){
     urlInput.value = isEdit ? paddle.affiliate_url : '';
     codeInput.value = isEdit ? paddle.discount_code : '';
     percentInput.value = isEdit ? (paddle.discount_percent || '') : '';
+    amountInput.value = isEdit ? (paddle.discount_amount || '') : '';
     priceInput.value = isEdit ? (paddle.price || '') : '';
     msrpInput.value = isEdit ? (paddle.msrp || '') : '';
     powerInput.value = isEdit ? (paddle.power_score || '') : '';
@@ -178,6 +180,7 @@ window.bpAdminPaddles = (function(){
       affiliate_url: urlInput.value.trim(),
       discount_code: codeInput.value.trim(),
       discount_percent: Number(percentInput.value) || 0,
+      discount_amount: Number(amountInput.value) || 0,
       price: Number(priceInput.value) || 0,
       msrp: Number(msrpInput.value) || 0,
       power_score: Number(powerInput.value) || 0,

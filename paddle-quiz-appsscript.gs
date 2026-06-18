@@ -4,11 +4,16 @@ function setupPaddleSheets() {
   let paddles = ss.getSheetByName('Paddles');
   if (!paddles) {
     paddles = ss.insertSheet('Paddles');
-    let paddleHeaders = ['id','name','image_url','affiliate_url','discount_code','discount_percent','price','msrp','power_score','control_score','spin_score','skill_tiers','categories','description','active','created_at','updated_at'];
+    let paddleHeaders = ['id','name','image_url','affiliate_url','discount_code','discount_percent','price','msrp','power_score','control_score','spin_score','skill_tiers','categories','description','active','created_at','updated_at','discount_amount'];
     paddles.getRange(1, 1, 1, paddleHeaders.length).setValues([paddleHeaders]);
     paddles.getRange(1, 1, 1, paddleHeaders.length).setFontWeight('bold').setBackground('#f1f5f9');
     paddles.setFrozenRows(1);
     paddles.setColumnWidths(1, paddleHeaders.length, 140);
+  } else {
+    const headerRow = paddles.getRange(1, 1, 1, paddles.getLastColumn()).getValues()[0];
+    if (headerRow.indexOf('discount_amount') === -1) {
+      paddles.getRange(1, headerRow.length + 1).setValue('discount_amount').setFontWeight('bold').setBackground('#f1f5f9');
+    }
   }
 
   let categories = ss.getSheetByName('Categories');
@@ -54,7 +59,8 @@ function paddleRowToObject(row) {
     description: row[13] || '',
     active: row[14] === true || String(row[14]).toUpperCase() === 'TRUE',
     created_at: row[15],
-    updated_at: row[16]
+    updated_at: row[16],
+    discount_amount: Number(row[17]) || 0
   };
 }
 
@@ -76,7 +82,8 @@ function paddlePayloadToRow(id, data, createdAt) {
     String(data.description || ''),
     data.active === false ? 'FALSE' : 'TRUE',
     createdAt,
-    new Date()
+    new Date(),
+    Number(data.discount_amount) || 0
   ];
 }
 

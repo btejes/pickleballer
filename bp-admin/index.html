@@ -251,8 +251,12 @@
           <input type="text" id="bp-paddle-code" class="bp-input" placeholder="BEPICKLEBALLER">
         </div>
         <div>
-          <label class="bp-label">Discount Percent</label>
+          <label class="bp-label">Discount % off</label>
           <input type="number" id="bp-paddle-percent" class="bp-input" placeholder="10" min="0" max="100">
+        </div>
+        <div>
+          <label class="bp-label">Discount $ off</label>
+          <input type="number" id="bp-paddle-amount" class="bp-input" placeholder="20" min="0" step="0.01">
         </div>
         <div>
           <label class="bp-label">Price (USD)</label>
@@ -263,16 +267,16 @@
           <input type="number" id="bp-paddle-msrp" class="bp-input" placeholder="119.99" step="0.01" min="0">
         </div>
         <div class="md:col-span-2">
-          <label class="bp-label">Performance Scores (1-5)</label>
+          <label class="bp-label">Performance Scores (1-10)</label>
           <div class="grid grid-cols-3 gap-3">
             <div>
-              <input type="number" id="bp-paddle-power" class="bp-input" min="1" max="5" step="1" placeholder="Power">
+              <input type="number" id="bp-paddle-power" class="bp-input" min="1" max="10" step="1" placeholder="Power">
             </div>
             <div>
-              <input type="number" id="bp-paddle-control" class="bp-input" min="1" max="5" step="1" placeholder="Control">
+              <input type="number" id="bp-paddle-control" class="bp-input" min="1" max="10" step="1" placeholder="Control">
             </div>
             <div>
-              <input type="number" id="bp-paddle-spin" class="bp-input" min="1" max="5" step="1" placeholder="Spin">
+              <input type="number" id="bp-paddle-spin" class="bp-input" min="1" max="10" step="1" placeholder="Spin">
             </div>
           </div>
         </div>

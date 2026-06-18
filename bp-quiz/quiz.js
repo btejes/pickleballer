@@ -408,7 +408,7 @@
     top.innerHTML = '<span>Your Results</span><span class="text-xs font-semibold text-emerald-600 inline-flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>Quiz complete</span>';
     doc.appendChild(top);
 
-    let profile = r.profile || { Control: 3, Power: 3, Spin: 3 };
+    let profile = r.profile || { Control: 5, Power: 5, Spin: 5 };
     let profCard = document.createElement('div');
     profCard.className = 'bp-profile-card';
     profCard.innerHTML =
@@ -425,9 +425,9 @@
           return '<div class="bp-dim-row">' +
             '<div class="bp-dim-labelblock">' +
               '<div class="bp-dim-label">' + d + '</div>' +
-              '<div class="bp-dim-value"><strong>' + (v * 2) + '</strong> <span class="bp-dim-value-suffix">/10</span></div>' +
+              '<div class="bp-dim-value"><strong>' + v + '</strong> <span class="bp-dim-value-suffix">/10</span></div>' +
             '</div>' +
-            '<div class="bp-dim-bar"><div class="bp-dim-bar-fill" style="width: ' + (v * 20) + '%"></div></div>' +
+            '<div class="bp-dim-bar"><div class="bp-dim-bar-fill" style="width: ' + (v * 10) + '%"></div></div>' +
           '</div>';
         }).join('') +
       '</div>';
@@ -469,13 +469,14 @@
         card.className = 'bp-paddle-card' + (idx === 0 ? ' top-match' : '');
 
         let badgeClass = idx === 0 ? '' : (idx === 1 ? ' second' : ' third');
-        let savings = (p.msrp && p.price && p.msrp > p.price) ? (p.msrp - p.price) : 0;
+        let dollarOff = Number(p.discount_amount) || ((p.msrp && p.price && p.msrp > p.price) ? (p.msrp - p.price) : 0);
+        let discountSuffix = dollarOff > 0
+          ? ' for $' + Math.round(dollarOff) + ' off'
+          : (p.discount_percent ? ' for ' + p.discount_percent + '% off' : '');
         let codeLine = p.discount_code
           ? '<div class="bp-paddle-code">' +
               '<svg class="w-3.5 h-3.5 bp-paddle-code-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>' +
-              '<span>Use code <strong>' + p.discount_code + '</strong>' +
-              (savings > 0 ? ' to save about $' + Math.round(savings) : (p.discount_percent ? ' for ' + p.discount_percent + '% off' : '')) +
-              '</span>' +
+              '<span>Use code <strong>' + p.discount_code + '</strong>' + discountSuffix + '</span>' +
             '</div>'
           : '';
         let reason = p.description
@@ -632,18 +633,16 @@
       { key: 'Spin',    user: profile.Spin    || 0, paddle: paddle.spin_score    || 0 }
     ];
     let cols = dims.map(function(d){
-      let uDisp = d.user * 2;
-      let pDisp = d.paddle * 2;
       return '<div class="bp-compare-col">' +
         '<div class="bp-compare-col-head">' + d.key + '</div>' +
-        '<div class="bp-compare-col-inline"><span>You ' + uDisp + '</span><span class="bp-compare-divider">|</span><span>Paddle ' + pDisp + '</span></div>' +
+        '<div class="bp-compare-col-inline"><span>You ' + d.user + '</span><span class="bp-compare-divider">|</span><span>Paddle ' + d.paddle + '</span></div>' +
         '<div class="bp-compare-bar-row">' +
-          '<div class="bp-compare-cell-bar"><div class="bp-compare-cell-fill you" style="width:' + (d.user * 20) + '%"></div></div>' +
-          '<span class="bp-compare-bar-value">' + uDisp + '/10</span>' +
+          '<div class="bp-compare-cell-bar"><div class="bp-compare-cell-fill you" style="width:' + Math.min(100, d.user * 10) + '%"></div></div>' +
+          '<span class="bp-compare-bar-value">' + d.user + '/10</span>' +
         '</div>' +
         '<div class="bp-compare-bar-row">' +
-          '<div class="bp-compare-cell-bar"><div class="bp-compare-cell-fill paddle" style="width:' + (d.paddle * 20) + '%"></div></div>' +
-          '<span class="bp-compare-bar-value">' + pDisp + '/10</span>' +
+          '<div class="bp-compare-cell-bar"><div class="bp-compare-cell-fill paddle" style="width:' + Math.min(100, d.paddle * 10) + '%"></div></div>' +
+          '<span class="bp-compare-bar-value">' + d.paddle + '/10</span>' +
         '</div>' +
       '</div>';
     }).join('');

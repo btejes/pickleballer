@@ -84,9 +84,9 @@ window.BP_QUESTIONS = [
     id: 'q7',
     type: 'slider',
     title: 'How aggressive is your play style?',
-    helper: 'Slide between very patient (1) and very aggressive (5).',
+    helper: 'Slide between very patient (1) and very aggressive (10).',
     min: 1,
-    max: 5,
+    max: 10,
     minLabel: 'Patient / control-first',
     maxLabel: 'Aggressive / attack-first'
   },
@@ -161,7 +161,7 @@ window.BP_QUESTIONS = [
     type: 'slider',
     title: 'How important is spin to your game?',
     min: 1,
-    max: 5,
+    max: 10,
     minLabel: 'Not important',
     maxLabel: 'Very important'
   },
@@ -170,7 +170,7 @@ window.BP_QUESTIONS = [
     type: 'slider',
     title: 'How important is power to your game?',
     min: 1,
-    max: 5,
+    max: 10,
     minLabel: 'Not important',
     maxLabel: 'Very important'
   },
@@ -179,7 +179,7 @@ window.BP_QUESTIONS = [
     type: 'slider',
     title: 'How important is control, touch, and placement?',
     min: 1,
-    max: 5,
+    max: 10,
     minLabel: 'Not important',
     maxLabel: 'Very important'
   },
@@ -188,7 +188,7 @@ window.BP_QUESTIONS = [
     type: 'slider',
     title: 'How important is a large sweet spot and forgiveness?',
     min: 1,
-    max: 5,
+    max: 10,
     minLabel: 'Not important',
     maxLabel: 'Very important'
   },
@@ -197,7 +197,7 @@ window.BP_QUESTIONS = [
     type: 'slider',
     title: 'How important is hand speed at the kitchen?',
     min: 1,
-    max: 5,
+    max: 10,
     minLabel: 'Not important',
     maxLabel: 'Very important'
   },
