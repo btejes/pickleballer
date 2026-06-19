@@ -390,11 +390,67 @@
       }
       window.bpQuiz.clearState();
       if (r.id) window.bpQuiz.setResultIdInUrl(r.id);
-      renderResults(r);
+      showEmailGate(r);
     }).catch(function(err){
       console.error('submit_quiz error:', err);
       rSlot.innerHTML = '<div class="bp-question-card text-center"><p class="text-red-600 font-semibold mb-2">Network error.</p><p class="text-sm text-slate-600">' + (err && err.message ? err.message : 'Could not reach the server.') + '</p></div>';
     });
+  }
+
+  function showEmailGate(r) {
+    rSlot.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'bp-email-gate';
+    card.innerHTML =
+      '<div class="bp-email-gate-icon">' +
+        '<svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>' +
+      '</div>' +
+      '<h2 class="bp-email-gate-title">Almost there!</h2>' +
+      '<p class="bp-email-gate-helper">Enter your email to see your paddle matches. We will also send the results, discount codes, and links so you can come back later.</p>' +
+      '<input type="email" id="bp-gate-email" class="bp-email-input" placeholder="your@email.com" autocomplete="email">' +
+      '<button type="button" id="bp-gate-submit" class="bp-email-submit">See My Results</button>' +
+      '<button type="button" id="bp-gate-skip" class="bp-email-gate-skip">Skip and see results</button>';
+    rSlot.appendChild(card);
+
+    const emailInput = document.getElementById('bp-gate-email');
+    const submitBtn = document.getElementById('bp-gate-submit');
+    const skipBtn = document.getElementById('bp-gate-skip');
+
+    setTimeout(function(){ emailInput.focus(); }, 50);
+
+    function showResultsWithEmail(emailSubmitted) {
+      r._emailSubmitted = emailSubmitted;
+      renderResults(r);
+    }
+
+    submitBtn.addEventListener('click', function(){
+      const email = (emailInput.value || '').trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        emailInput.focus();
+        emailInput.classList.add('bp-email-input-error');
+        return;
+      }
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving...';
+      api('attach_email', { id: r.id, email: email }).then(function(){
+        showResultsWithEmail(true);
+      }).catch(function(){
+        showResultsWithEmail(true);
+      });
+    });
+
+    emailInput.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') submitBtn.click();
+    });
+    emailInput.addEventListener('input', function(){
+      emailInput.classList.remove('bp-email-input-error');
+    });
+
+    skipBtn.addEventListener('click', function(){
+      showResultsWithEmail(false);
+    });
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function renderResults(r) {
@@ -518,8 +574,9 @@
       });
     }
 
-    // --- Email capture ---
-    let emailCard = document.createElement('div');
+    // Skip the email capture card if email was already submitted via the gate
+    let emailCard = r._emailSubmitted ? null : document.createElement('div');
+    if (emailCard) {
     emailCard.className = 'bp-email-card';
     emailCard.innerHTML =
       '<div class="bp-email-icon"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg></div>' +
@@ -565,6 +622,7 @@
         });
       });
     }, 0);
+    }
 
     // --- Retake link ---
     let retake = document.createElement('div');
