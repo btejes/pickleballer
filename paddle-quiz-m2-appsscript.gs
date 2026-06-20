@@ -89,6 +89,16 @@ function setupQuizSheets() {
     clicks.setFrozenRows(1);
   }
 
+  let overrides = ss.getSheetByName('QuestionOverrides');
+  if (!overrides) {
+    overrides = ss.insertSheet('QuestionOverrides');
+    let overrideHeaders = ['id','text','helper','hidden'];
+    overrides.getRange(1, 1, 1, overrideHeaders.length).setValues([overrideHeaders]);
+    overrides.getRange(1, 1, 1, overrideHeaders.length).setFontWeight('bold').setBackground('#f1f5f9');
+    overrides.setFrozenRows(1);
+    overrides.setColumnWidths(1, overrideHeaders.length, 200);
+  }
+
   let catsSheet = ss.getSheetByName('Categories');
   if (catsSheet) {
     let existing = catsSheet.getDataRange().getValues();
@@ -346,6 +356,56 @@ function findAnswerInQuestions(qid, aid) {
 
 function handleListFilters(data) {
   return jsonResponse({ success: true, filters: FILTER_ANSWERS });
+}
+
+function getOverridesSheet() {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName('QuestionOverrides');
+}
+
+function handleListQuestionOverrides(data) {
+  const sheet = getOverridesSheet();
+  if (!sheet) return jsonResponse({ success: true, overrides: {} });
+  const values = sheet.getDataRange().getValues();
+  const overrides = {};
+  for (let i = 1; i < values.length; i++) {
+    const id = String(values[i][0] || '').trim();
+    if (!id) continue;
+    overrides[id] = {
+      text: String(values[i][1] || ''),
+      helper: String(values[i][2] || ''),
+      hidden: values[i][3] === true || String(values[i][3]).toUpperCase() === 'TRUE'
+    };
+  }
+  return jsonResponse({ success: true, overrides: overrides });
+}
+
+function handleSaveQuestionOverrides(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('QuestionOverrides');
+  if (!sheet) {
+    sheet = ss.insertSheet('QuestionOverrides');
+    const headers = ['id','text','helper','hidden'];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#f1f5f9');
+    sheet.setFrozenRows(1);
+  }
+  if (sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).clearContent();
+  }
+  const overrides = data.overrides || {};
+  const rows = [];
+  Object.keys(overrides).forEach(function(id){
+    const o = overrides[id] || {};
+    const text = String(o.text || '').trim();
+    const helper = String(o.helper || '').trim();
+    const hidden = o.hidden === true;
+    if (!text && !helper && !hidden) return;
+    rows.push([id, text, helper, hidden ? 'TRUE' : 'FALSE']);
+  });
+  if (rows.length > 0) {
+    sheet.getRange(2, 1, rows.length, 4).setValues(rows);
+  }
+  return jsonResponse({ success: true, rows: rows.length });
 }
 
 function handleSubmitQuiz(data) {

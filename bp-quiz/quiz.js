@@ -17,15 +17,43 @@
 
   let searchDebounce;
 
+  function applyOverrides(overrides) {
+    if (!overrides || typeof overrides !== 'object') return;
+    QUESTIONS = QUESTIONS.filter(function(q){
+      const o = overrides[q.id];
+      return !(o && o.hidden);
+    });
+    QUESTIONS.forEach(function(q){
+      const o = overrides[q.id];
+      if (o) {
+        if (o.text) q.title = o.text;
+        if (o.helper) q.helper = o.helper;
+      }
+      if (q.answers) {
+        q.answers.forEach(function(a){
+          const ao = overrides[a.id];
+          if (ao) {
+            if (ao.text) a.label = ao.text;
+            if (ao.helper) a.helper = ao.helper;
+          }
+        });
+      }
+    });
+  }
+
   function start() {
-    let resultId = window.bpQuiz.getResultIdFromUrl();
-    if (resultId) {
-      loadResultById(resultId);
-    } else {
-      loadingEl.classList.add('hidden');
-      qSlot.classList.remove('hidden');
-      renderQuestion();
-    }
+    api('list_question_overrides').then(function(r){
+      if (r && r.success) applyOverrides(r.overrides);
+    }).catch(function(){}).then(function(){
+      let resultId = window.bpQuiz.getResultIdFromUrl();
+      if (resultId) {
+        loadResultById(resultId);
+      } else {
+        loadingEl.classList.add('hidden');
+        qSlot.classList.remove('hidden');
+        renderQuestion();
+      }
+    });
   }
 
   function loadResultById(id) {

@@ -55,6 +55,7 @@
         <button type="button" data-tab="paddles" class="bp-tab-btn px-3 py-1.5 text-sm font-semibold rounded-md transition">Paddles</button>
         <button type="button" data-tab="categories" class="bp-tab-btn px-3 py-1.5 text-sm font-semibold rounded-md transition">Categories</button>
         <button type="button" data-tab="mappings" class="bp-tab-btn px-3 py-1.5 text-sm font-semibold rounded-md transition">Quiz Mapping</button>
+        <button type="button" data-tab="questions" class="bp-tab-btn px-3 py-1.5 text-sm font-semibold rounded-md transition">Questions</button>
         <button type="button" data-tab="events" class="bp-tab-btn px-3 py-1.5 text-sm font-semibold rounded-md transition">Events</button>
       </nav>
       <button id="bp-logout-btn" class="text-sm font-semibold text-slate-700 hover:text-red-600 px-3 py-1.5 border border-slate-200 rounded-lg hover:border-red-200 hover:bg-red-50 transition">Logout</button>
@@ -184,6 +185,20 @@
           <button type="button" id="bp-mapping-save-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2 px-5 rounded-lg text-sm transition shadow-sm hover:shadow flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">Save All</button>
         </div>
         <div id="bp-mapping-list" class="space-y-4"></div>
+      </section>
+    </div>
+
+    <!-- ============ Questions Editor Tab ============ -->
+    <div id="bp-tab-questions" class="bp-tab-content hidden">
+      <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <div>
+            <h2 class="text-base font-bold text-slate-900 mb-1">Questions</h2>
+            <p class="text-sm text-slate-500">Toggle visibility, edit the question wording, or edit answer labels. Hidden questions are skipped in the quiz and do not contribute to scoring.</p>
+          </div>
+          <button type="button" id="bp-questions-save-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2 px-5 rounded-lg text-sm transition shadow-sm hover:shadow flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">Save All</button>
+        </div>
+        <div id="bp-questions-list" class="space-y-4"></div>
       </section>
     </div>
 
@@ -335,6 +350,7 @@
 <script src="categories.js"></script>
 <script src="paddles.js"></script>
 <script src="mappings.js"></script>
+<script src="questions-editor.js"></script>
 <script src="events.js"></script>
 </body>
 </html>
