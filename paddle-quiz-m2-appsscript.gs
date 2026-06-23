@@ -128,44 +128,96 @@ function getClicksSheet() {
   return SpreadsheetApp.getActiveSpreadsheet().getSheetByName('PaddleClicks');
 }
 
+const MAPPINGS_CACHE_KEY = 'bp_mappings_v1';
+const PADDLES_CACHE_KEY = 'bp_paddles_v1';
+const CACHE_TTL_SECONDS = 300;
+
 function loadMappings() {
-  let sheet = getMappingsSheet();
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get(MAPPINGS_CACHE_KEY);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (err) {}
+  }
+  const sheet = getMappingsSheet();
   if (!sheet) return {};
-  let values = sheet.getDataRange().getValues();
-  let map = {};
+  const values = sheet.getDataRange().getValues();
+  const map = {};
   for (let i = 1; i < values.length; i++) {
-    let qid = String(values[i][0] || '').trim();
-    let aid = String(values[i][1] || '').trim();
-    let cats = String(values[i][2] || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+    const qid = String(values[i][0] || '').trim();
+    const aid = String(values[i][1] || '').trim();
+    const cats = String(values[i][2] || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
     if (!qid || !aid) continue;
     if (!map[qid]) map[qid] = {};
     map[qid][aid] = cats;
   }
+  try { cache.put(MAPPINGS_CACHE_KEY, JSON.stringify(map), CACHE_TTL_SECONDS); } catch (err) {}
   return map;
 }
 
+function invalidateMappingsCache() {
+  try { CacheService.getScriptCache().remove(MAPPINGS_CACHE_KEY); } catch (err) {}
+}
+
+function invalidatePaddlesCache() {
+  try { CacheService.getScriptCache().remove(PADDLES_CACHE_KEY); } catch (err) {}
+}
+
+function loadActivePaddlesCached() {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get(PADDLES_CACHE_KEY);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (err) {}
+  }
+  const sheet = getPaddlesSheet();
+  if (!sheet) return [];
+  const values = sheet.getDataRange().getValues();
+  const all = [];
+  for (let i = 1; i < values.length; i++) {
+    if (!values[i][0]) continue;
+    const p = paddleRowToObject(values[i]);
+    if (!p.active) continue;
+    all.push(p);
+  }
+  try { cache.put(PADDLES_CACHE_KEY, JSON.stringify(all), CACHE_TTL_SECONDS); } catch (err) {}
+  return all;
+}
+
 function handleListMappings(data) {
+  requireAuth(data);
   return jsonResponse({ success: true, mappings: loadMappings() });
 }
 
 function handleSaveMappings(data) {
-  let sheet = getMappingsSheet();
+  requireAuth(data);
+  const sheet = getMappingsSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Mappings sheet missing, run setupQuizSheets()' });
-  let mappings = data.mappings || {};
-  if (sheet.getLastRow() > 1) {
-    sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).clearContent();
-  }
-  let rows = [];
+  const mappings = data.mappings || {};
+
+  // Build new rows FIRST. Only touch the sheet once we have valid data ready,
+  // so a malformed payload can never destroy existing mappings.
+  const rows = [];
   Object.keys(mappings).forEach(function(qid){
-    let answers = mappings[qid] || {};
+    const answers = mappings[qid] || {};
     Object.keys(answers).forEach(function(aid){
-      let cats = answers[aid] || [];
-      let catsStr = Array.isArray(cats) ? cats.join(',') : String(cats || '');
+      const cats = answers[aid] || [];
+      const catsStr = Array.isArray(cats) ? cats.join(',') : String(cats || '');
       rows.push([qid, aid, catsStr]);
     });
   });
-  if (rows.length > 0) {
-    sheet.getRange(2, 1, rows.length, 3).setValues(rows);
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    if (sheet.getLastRow() > 1) {
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).clearContent();
+    }
+    if (rows.length > 0) {
+      sheet.getRange(2, 1, rows.length, 3).setValues(rows);
+    }
+    SpreadsheetApp.flush();
+    invalidateMappingsCache();
+  } finally {
+    lock.releaseLock();
   }
   return jsonResponse({ success: true, rows: rows.length });
 }
@@ -188,18 +240,9 @@ function handlePaddleSearch(data) {
 }
 
 function runMatching(answers) {
-  let mappings = loadMappings();
-  let paddlesSheet = getPaddlesSheet();
-  if (!paddlesSheet) return { paddles: [], duprMin: 0, duprMax: 7, budgetMax: 99999 };
-
-  let values = paddlesSheet.getDataRange().getValues();
-  let allPaddles = [];
-  for (let i = 1; i < values.length; i++) {
-    if (!values[i][0]) continue;
-    let p = paddleRowToObject(values[i]);
-    if (!p.active) continue;
-    allPaddles.push(p);
-  }
+  const mappings = loadMappings();
+  const allPaddles = loadActivePaddlesCached();
+  if (allPaddles.length === 0) return { paddles: [], duprMin: 0, duprMax: 7, budgetMax: 99999 };
 
   // Apply DUPR filter from Q5
   let duprMin = 0, duprMax = 7;
@@ -380,6 +423,7 @@ function handleListQuestionOverrides(data) {
 }
 
 function handleSaveQuestionOverrides(data) {
+  requireAuth(data);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName('QuestionOverrides');
   if (!sheet) {
@@ -461,6 +505,7 @@ function handleSubmitQuiz(data) {
 }
 
 function handleListEvents(data) {
+  requireAuth(data);
   let completions = getCompletionsSheet();
   if (!completions) return jsonResponse({ success: false, error: 'Completions sheet missing' });
   let clicks = getClicksSheet();
@@ -514,6 +559,7 @@ function handleListEvents(data) {
 }
 
 function handleListSubscribersWithResults(data) {
+  requireAuth(data);
   let subs = getSubscribersSheet();
   if (!subs) return jsonResponse({ success: false, error: 'Subscribers sheet missing' });
   let completions = getCompletionsSheet();

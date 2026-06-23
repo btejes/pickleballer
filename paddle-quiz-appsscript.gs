@@ -88,10 +88,11 @@ function paddlePayloadToRow(id, data, createdAt) {
 }
 
 function handleListPaddles(data) {
-  let sheet = getPaddlesSheet();
+  requireAuth(data);
+  const sheet = getPaddlesSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Paddles sheet missing, run setupPaddleSheets()' });
-  let values = sheet.getDataRange().getValues();
-  let paddles = [];
+  const values = sheet.getDataRange().getValues();
+  const paddles = [];
   for (let i = 1; i < values.length; i++) {
     if (values[i][0]) paddles.push(paddleRowToObject(values[i]));
   }
@@ -99,28 +100,32 @@ function handleListPaddles(data) {
 }
 
 function handleAddPaddle(data) {
-  let sheet = getPaddlesSheet();
+  requireAuth(data);
+  const sheet = getPaddlesSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Paddles sheet missing, run setupPaddleSheets()' });
-  let name = String(data.name || '').trim();
+  const name = String(data.name || '').trim();
   if (!name) return jsonResponse({ success: false, error: 'Name required' });
-  let id = generateId();
-  let row = paddlePayloadToRow(id, data, new Date());
+  const id = generateId();
+  const row = paddlePayloadToRow(id, data, new Date());
   sheet.appendRow(row);
+  invalidatePaddlesCache();
   return jsonResponse({ success: true, id: id });
 }
 
 function handleUpdatePaddle(data) {
-  let sheet = getPaddlesSheet();
+  requireAuth(data);
+  const sheet = getPaddlesSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Paddles sheet missing' });
-  let id = String(data.id || '').trim();
+  const id = String(data.id || '').trim();
   if (!id) return jsonResponse({ success: false, error: 'ID required' });
-  let values = sheet.getDataRange().getValues();
+  const values = sheet.getDataRange().getValues();
   for (let i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
-      let existing = paddleRowToObject(values[i]);
-      let merged = Object.assign({}, existing, data);
-      let row = paddlePayloadToRow(id, merged, existing.created_at || new Date());
+      const existing = paddleRowToObject(values[i]);
+      const merged = Object.assign({}, existing, data);
+      const row = paddlePayloadToRow(id, merged, existing.created_at || new Date());
       sheet.getRange(i + 1, 1, 1, row.length).setValues([row]);
+      invalidatePaddlesCache();
       return jsonResponse({ success: true });
     }
   }
@@ -128,14 +133,16 @@ function handleUpdatePaddle(data) {
 }
 
 function handleDeletePaddle(data) {
-  let sheet = getPaddlesSheet();
+  requireAuth(data);
+  const sheet = getPaddlesSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Paddles sheet missing' });
-  let id = String(data.id || '').trim();
+  const id = String(data.id || '').trim();
   if (!id) return jsonResponse({ success: false, error: 'ID required' });
-  let values = sheet.getDataRange().getValues();
+  const values = sheet.getDataRange().getValues();
   for (let i = values.length - 1; i >= 1; i--) {
     if (values[i][0] === id) {
       sheet.deleteRow(i + 1);
+      invalidatePaddlesCache();
       return jsonResponse({ success: true });
     }
   }
