@@ -1,7 +1,7 @@
 // Quiz questions. Category mapping per answer is set in the admin.
 // DUPR ranges and budget brackets live in the Apps Script (FILTER_ANSWERS).
 
-window.BP_QUESTIONS = [
+export const BP_QUESTIONS = [
   {
     id: 'q1',
     type: 'search',

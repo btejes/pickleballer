@@ -1,9 +1,7 @@
-(function(){
-  const api = window.bpAdmin.api;
-  const showToast = window.bpAdmin.showToast;
-  const csvInput = document.getElementById('bp-csv-input');
-  if (!csvInput) return;
+import { api, showToast } from './app.js';
 
+const csvInput = document.getElementById('bp-csv-input');
+if (csvInput) {
   csvInput.addEventListener('change', function(e){
     const file = e.target.files[0];
     if (!file) return;
@@ -30,4 +28,4 @@
       }
     });
   });
-})();
+}

@@ -1,7 +1,9 @@
+import { BP_QUESTIONS } from './questions.js';
+import { api, loadState, saveState, clearState, getResultIdFromUrl, setResultIdInUrl } from './app.js';
+
 (function(){
-  let QUESTIONS = window.BP_QUESTIONS || [];
-  let api = window.bpQuiz.api;
-  let state = window.bpQuiz.loadState();
+  let QUESTIONS = BP_QUESTIONS.slice();
+  let state = loadState();
 
   let loadingEl = document.getElementById('bp-loading');
   let qSlot = document.getElementById('bp-question-slot');
@@ -45,7 +47,7 @@
     api('list_question_overrides').then(function(r){
       if (r && r.success) applyOverrides(r.overrides);
     }).catch(function(){}).then(function(){
-      let resultId = window.bpQuiz.getResultIdFromUrl();
+      let resultId = getResultIdFromUrl();
       if (resultId) {
         loadResultById(resultId);
       } else {
@@ -176,7 +178,7 @@
   }
 
   function persist() {
-    window.bpQuiz.saveState(state);
+    saveState(state);
   }
 
   function renderChoices(container, q) {
@@ -416,8 +418,8 @@
         rSlot.innerHTML = '<div class="bp-question-card text-center"><p class="text-red-600 font-semibold mb-2">Something went wrong.</p><p class="text-sm text-slate-600">' + (r.error || 'Unknown error') + '</p></div>';
         return;
       }
-      window.bpQuiz.clearState();
-      if (r.id) window.bpQuiz.setResultIdInUrl(r.id);
+      clearState();
+      if (r.id) setResultIdInUrl(r.id);
       showEmailGate(r);
     }).catch(function(err){
       console.error('submit_quiz error:', err);
@@ -624,7 +626,7 @@
           input.focus();
           return;
         }
-        let resultId = r.id || window.bpQuiz.getResultIdFromUrl();
+        let resultId = r.id || getResultIdFromUrl();
         if (!resultId) {
           emailCard.innerHTML = '<div class="bp-email-thanks" style="color:#dc2626">Could not attach email to results. Please retake the quiz.</div>';
           return;
@@ -666,7 +668,7 @@
         if (!a) return;
         let paddleId = a.getAttribute('data-paddle-id') || '';
         let paddleName = a.getAttribute('data-paddle-name') || '';
-        let completionId = (r && r.id) || window.bpQuiz.getResultIdFromUrl() || '';
+        let completionId = (r && r.id) || getResultIdFromUrl() || '';
         api('track_click', {
           completion_id: completionId,
           paddle_id: paddleId,
@@ -680,7 +682,7 @@
       let btn = document.getElementById('bp-retake-btn');
       if (btn) {
         btn.addEventListener('click', function(){
-          window.bpQuiz.clearState();
+          clearState();
           state = { currentIndex: 0, answers: {}, currentPaddleName: '' };
           try {
             let url = new URL(window.location.href);

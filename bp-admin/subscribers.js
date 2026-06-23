@@ -1,8 +1,4 @@
-(function(){
-  const api = window.bpAdmin.api;
-  const showToast = window.bpAdmin.showToast;
-  const withSpinner = window.bpAdmin.withSpinner;
-  const spinnerSvg = window.bpAdmin.spinnerSvg;
+import { api, showToast, withSpinner, spinnerSvg, onInit } from './app.js';
 
   const addBtn = document.getElementById('bp-add-btn');
   const newEmailInput = document.getElementById('bp-new-email');
@@ -141,7 +137,6 @@
     loadSubscribers();
   });
 
-  window.bpAdmin.onInit(function(){
-    loadSubscribers();
-  });
-})();
+onInit(function(){
+  loadSubscribers();
+});
