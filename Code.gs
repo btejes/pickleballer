@@ -205,29 +205,35 @@ function handleSendNewsletter(data) {
     if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) emails.push(e);
   }
 
+  const CHUNK_SIZE = 50;
   let sent = 0;
   let failed = 0;
   const cache = CacheService.getScriptCache();
   cache.put('send_progress', JSON.stringify({ sent: 0, total: emails.length, failed: 0 }), 600);
 
-  emails.forEach(function(to, idx){
-    try {
-      const resp = UrlFetchApp.fetch('https://api.resend.com/emails', {
+  for (let i = 0; i < emails.length; i += CHUNK_SIZE) {
+    const chunk = emails.slice(i, i + CHUNK_SIZE);
+    const requests = chunk.map(function(to){
+      return {
+        url: 'https://api.resend.com/emails',
         method: 'post',
         contentType: 'application/json',
         headers: { 'Authorization': 'Bearer ' + apiKey },
         payload: JSON.stringify({ from: fromAddr, to: [to], subject: subject, html: html }),
         muteHttpExceptions: true
+      };
+    });
+    try {
+      const responses = UrlFetchApp.fetchAll(requests);
+      responses.forEach(function(resp){
+        const code = resp.getResponseCode();
+        if (code >= 200 && code < 300) sent++; else failed++;
       });
-      const code = resp.getResponseCode();
-      if (code >= 200 && code < 300) sent++; else failed++;
     } catch (err) {
-      failed++;
+      failed += chunk.length;
     }
-    if ((idx + 1) % 10 === 0 || idx === emails.length - 1) {
-      cache.put('send_progress', JSON.stringify({ sent: sent, total: emails.length, failed: failed }), 600);
-    }
-  });
+    cache.put('send_progress', JSON.stringify({ sent: sent, total: emails.length, failed: failed }), 600);
+  }
 
   return jsonResponse({ success: true, sent: sent, total: emails.length, failed: failed });
 }
