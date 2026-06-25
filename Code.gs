@@ -187,6 +187,43 @@ const NEWSLETTER_JOB_KEY = 'newsletter_job';
 const NEWSLETTER_CHUNK_SIZE = 25;
 const NEWSLETTER_MAX_RUNTIME_MS = 4 * 60 * 1000;
 
+function sendNewsletterPreview() {
+  const props = PropertiesService.getScriptProperties();
+  const apiKey = props.getProperty('RESEND_API_KEY');
+  if (!apiKey) { Logger.log('RESEND_API_KEY not set'); return; }
+  const fromEmail = props.getProperty('FROM_EMAIL') || 'ben@bepickleballer.com';
+  const fromName = props.getProperty('FROM_NAME') || 'BePickleballer';
+  const fromAddr = fromName + ' <' + fromEmail + '>';
+
+  const TEST_EMAIL = 'dmytriisynchuk@gmail.com';
+  const subject = 'Newsletter layout test';
+
+  const rawHtml = ''
+    + '<p>Hi,</p>'
+    + '<p>This is paragraph one. It has some normal text to verify that the spacing between paragraphs is reasonable, not too cramped and not too far apart.</p>'
+    + '<p>This is paragraph two. Notice how this paragraph sits close to the one above without an awkward gap.</p>'
+    + '<p><strong>My quick take:</strong></p>'
+    + '<p>If the image below stays within the email column width and the paragraphs hug each other naturally, the post-processor is working.</p>'
+    + '<p><img src="https://placehold.co/1600x500/0891b2/ffffff/png?text=Wide+1600x500" width="1600"></p>'
+    + '<p>This paragraph follows the wide image. The image above should have been constrained to fit the column instead of overflowing.</p>'
+    + '<p>Thanks,<br>Ben</p>';
+
+  const html = prepareNewsletterHtml(rawHtml);
+
+  try {
+    const resp = UrlFetchApp.fetch('https://api.resend.com/emails', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+      payload: JSON.stringify({ from: fromAddr, to: [TEST_EMAIL], subject: subject, html: html }),
+      muteHttpExceptions: true
+    });
+    Logger.log('Preview sent to ' + TEST_EMAIL + ' (HTTP ' + resp.getResponseCode() + '): ' + resp.getContentText());
+  } catch (err) {
+    Logger.log('Preview send failed: ' + err);
+  }
+}
+
 function prepareNewsletterHtml(html) {
   let processed = String(html || '');
 
