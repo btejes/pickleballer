@@ -263,8 +263,8 @@ function prepareNewsletterHtml(html) {
 
   return ''
     + '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
-    + '<body style="margin:0;padding:16px;background:#ffffff;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#1f2937;">'
-    +   '<div style="max-width:600px;margin:0 auto;font-size:15px;line-height:1.5;">'
+    + '<body style="margin:0;padding:16px 16px 16px 0;background:#ffffff;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#1f2937;text-align:left;">'
+    +   '<div style="max-width:600px;margin:0;font-size:15px;line-height:1.5;text-align:left;">'
     +     processed
     +   '</div>'
     + '</body></html>';
