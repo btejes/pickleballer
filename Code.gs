@@ -411,17 +411,43 @@ function syncFullAudienceToResend() {
   const sheet = getSubscribersSheet();
   if (!sheet) { Logger.log('Subscribers sheet missing'); return; }
   const values = sheet.getDataRange().getValues();
-  const emails = [];
+  const sheetEmails = [];
   for (let i = 1; i < values.length; i++) {
     const e = String(values[i][1] || '').trim().toLowerCase();
-    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) emails.push(e);
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) sheetEmails.push(e);
   }
 
-  const CHUNK = 50;
+  const existing = new Set();
+  try {
+    const r = UrlFetchApp.fetch('https://api.resend.com/audiences/' + audienceId + '/contacts', {
+      method: 'get',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+      muteHttpExceptions: true
+    });
+    if (r.getResponseCode() < 300) {
+      const body = JSON.parse(r.getContentText());
+      (body.data || []).forEach(function(c){
+        if (c && c.email) existing.add(String(c.email).toLowerCase());
+      });
+    } else {
+      Logger.log('Could not list existing contacts: ' + r.getContentText());
+    }
+  } catch (err) {
+    Logger.log('List existing contacts error: ' + err);
+  }
+  Logger.log('Already in Resend audience: ' + existing.size);
+
+  const toAdd = sheetEmails.filter(function(e){ return !existing.has(e); });
+  Logger.log('Missing in Resend, will add: ' + toAdd.length);
+
+  const CHUNK = 8;
+  const DELAY_BETWEEN_CHUNKS_MS = 250;
   let added = 0;
-  let skipped = 0;
-  for (let i = 0; i < emails.length; i += CHUNK) {
-    const batch = emails.slice(i, i + CHUNK);
+  let failed = 0;
+  const failedEmails = [];
+
+  for (let i = 0; i < toAdd.length; i += CHUNK) {
+    const batch = toAdd.slice(i, i + CHUNK);
     const requests = batch.map(function(email){
       return {
         url: 'https://api.resend.com/audiences/' + audienceId + '/contacts',
@@ -434,16 +460,21 @@ function syncFullAudienceToResend() {
     });
     try {
       const responses = UrlFetchApp.fetchAll(requests);
-      responses.forEach(function(resp){
+      responses.forEach(function(resp, idx){
         const code = resp.getResponseCode();
         if (code >= 200 && code < 300) added++;
-        else skipped++;
+        else { failed++; if (failedEmails.length < 20) failedEmails.push(batch[idx] + ' (' + code + ')'); }
       });
     } catch (err) {
-      skipped += batch.length;
+      failed += batch.length;
     }
+    Utilities.sleep(DELAY_BETWEEN_CHUNKS_MS);
   }
-  Logger.log('Audience sync complete. Added/updated: ' + added + ', Skipped (likely duplicates): ' + skipped);
+
+  Logger.log('Sync complete. Already there: ' + existing.size + '. Added this run: ' + added + '. Failed: ' + failed);
+  if (failedEmails.length > 0) {
+    Logger.log('First failures: ' + failedEmails.join(', '));
+  }
 }
 
 function processNewsletterChunk() {
