@@ -36,6 +36,31 @@ function initEditor() {
   });
 }
 
+function pollBroadcastStatus(broadcastId) {
+  let attempts = 0;
+  const maxAttempts = 200;
+  const poll = setInterval(function(){
+    attempts++;
+    if (attempts > maxAttempts) { clearInterval(poll); return; }
+    api('broadcast_status', { broadcast_id: broadcastId }).then(function(r){
+      if (!r.success) return;
+      const status = (r.status || 'unknown').toLowerCase();
+      const audience = r.audience_count ? (' (' + r.audience_count + ' contacts)') : '';
+      if (status === 'sent' || status === 'delivered') {
+        sendStatus.textContent = 'Sent' + audience;
+        showToast('Newsletter delivered');
+        clearInterval(poll);
+      } else if (status === 'failed' || status === 'error') {
+        sendStatus.textContent = 'Failed';
+        showToast('Broadcast failed');
+        clearInterval(poll);
+      } else {
+        sendStatus.textContent = 'Status: ' + status + audience;
+      }
+    }).catch(function(){});
+  }, 3000);
+}
+
 sendBtn.addEventListener('click', function(){
   const subject = subjectInput.value.trim();
   const html = quill.root.innerHTML;
@@ -43,24 +68,23 @@ sendBtn.addEventListener('click', function(){
   if (!quill.getText().trim()) { showToast('Body required'); return; }
   if (!confirm('Send this newsletter to all subscribers?')) return;
   sendStatus.textContent = '';
-  const pollInterval = setInterval(function(){
-    api('send_status').then(function(r){
-      if (r.success && r.total > 0) sendStatus.textContent = 'Sent ' + r.sent + ' of ' + r.total;
-    });
-  }, 1500);
   withSpinner(sendBtn, 'Sending...', function(){
     return api('send_newsletter', { subject: subject, html: html }).then(function(r){
-      clearInterval(pollInterval);
       if (r.success) {
-        sendStatus.textContent = 'Sent ' + r.sent + ' of ' + r.total + (r.failed ? ', failed ' + r.failed : '');
-        showToast('Newsletter sent');
+        showToast('Newsletter queued');
         subjectInput.value = '';
         quill.setText('');
+        if (r.broadcast_id) {
+          sendStatus.textContent = 'Status: queued';
+          pollBroadcastStatus(r.broadcast_id);
+        } else {
+          sendStatus.textContent = r.message || 'Queued';
+        }
       } else {
         sendStatus.textContent = '';
         showToast(r.error || 'Send failed');
       }
-    }).catch(function(){ clearInterval(pollInterval); showToast('Send failed'); });
+    }).catch(function(){ showToast('Send failed'); });
   });
 });
 

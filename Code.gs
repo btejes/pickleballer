@@ -44,6 +44,7 @@ function doPost(e) {
       case 'import_csv':                     return handleImportCsv(data);
       case 'send_newsletter':                return handleSendNewsletter(data);
       case 'send_status':                    return handleSendStatus(data);
+      case 'broadcast_status':               return handleBroadcastStatus(data);
 
       case 'list_paddles':                   return handleListPaddles(data);
       case 'add_paddle':                     return handleAddPaddle(data);
@@ -263,8 +264,8 @@ function prepareNewsletterHtml(html) {
 
   return ''
     + '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
-    + '<body style="margin:0;padding:16px 16px 16px 0;background:#ffffff;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#1f2937;text-align:left;">'
-    +   '<div style="max-width:600px;margin:0;font-size:15px;line-height:1.5;text-align:left;">'
+    + '<body style="margin:0;padding:0;background:#ffffff;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#1f2937;text-align:left;">'
+    +   '<div style="max-width:600px;margin:0;padding:16px 16px 16px 0;font-size:15px;line-height:1.5;text-align:left;">'
     +     processed
     +   '</div>'
     + '</body></html>';
@@ -327,6 +328,33 @@ function createResendBroadcast(apiKey, audienceId, fromAddr, subject, html) {
     return { success: true, id: JSON.parse(body).id };
   } catch (err) {
     return { success: false, error: 'Create broadcast error: ' + err };
+  }
+}
+
+function handleBroadcastStatus(data) {
+  requireAuth(data);
+  const broadcastId = String(data.broadcast_id || '').trim();
+  if (!broadcastId) return jsonResponse({ success: false, error: 'broadcast_id required' });
+  const props = PropertiesService.getScriptProperties();
+  const apiKey = props.getProperty('RESEND_API_KEY');
+  if (!apiKey) return jsonResponse({ success: false, error: 'RESEND_API_KEY not set' });
+  try {
+    const resp = UrlFetchApp.fetch('https://api.resend.com/broadcasts/' + broadcastId, {
+      method: 'get',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+      muteHttpExceptions: true
+    });
+    const code = resp.getResponseCode();
+    if (code < 200 || code >= 300) return jsonResponse({ success: false, error: 'Status fetch failed (' + code + ')' });
+    const body = JSON.parse(resp.getContentText());
+    return jsonResponse({
+      success: true,
+      status: body.status || 'unknown',
+      sent_at: body.sent_at || null,
+      audience_count: body.audience_count || null
+    });
+  } catch (err) {
+    return jsonResponse({ success: false, error: 'Status error: ' + err });
   }
 }
 
