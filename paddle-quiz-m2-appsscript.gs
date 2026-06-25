@@ -491,7 +491,7 @@ function handleSubmitQuiz(data) {
       for (let i = 1; i < existing.length; i++) {
         if (String(existing[i][1]).toLowerCase() === email) { found = true; break; }
       }
-      if (!found) subs.appendRow([now, email, 'quiz']);
+      if (!found) { subs.appendRow([now, email, 'quiz']); addContactToResendAudience(email); }
     }
   }
 
@@ -639,7 +639,7 @@ function handleAttachEmail(data) {
         for (let j = 1; j < existing.length; j++) {
           if (String(existing[j][1]).toLowerCase() === email) { found = true; break; }
         }
-        if (!found) subs.appendRow([new Date(), email, 'quiz']);
+        if (!found) { subs.appendRow([new Date(), email, 'quiz']); addContactToResendAudience(email); }
       }
 
       try {

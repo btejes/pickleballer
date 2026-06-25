@@ -139,6 +139,7 @@ function handleAddSubscriber(data) {
     }
   }
   sheet.appendRow([new Date(), email, 'manual']);
+  addContactToResendAudience(email);
   return jsonResponse({ success: true });
 }
 
@@ -151,6 +152,7 @@ function handleDeleteSubscriber(data) {
   for (let i = values.length - 1; i >= 1; i--) {
     if (String(values[i][1]).toLowerCase() === email) {
       sheet.deleteRow(i + 1);
+      removeContactFromResendAudience(email);
       return jsonResponse({ success: true });
     }
   }
@@ -174,12 +176,15 @@ function handleImportCsv(data) {
   let imported = 0;
   let skipped = 0;
   const now = new Date();
+  const newlyAdded = [];
   incoming.forEach(function(e){
     if (existing[e]) { skipped++; return; }
     sheet.appendRow([now, e, 'csv']);
     existing[e] = true;
     imported++;
+    newlyAdded.push(e);
   });
+  newlyAdded.forEach(addContactToResendAudience);
   return jsonResponse({ success: true, imported: imported, skipped: skipped });
 }
 
@@ -268,8 +273,12 @@ function prepareNewsletterHtml(html) {
 function handleSendNewsletter(data) {
   requireAuth(data);
   const props = PropertiesService.getScriptProperties();
-  if (!props.getProperty('RESEND_API_KEY')) {
-    return jsonResponse({ success: false, error: 'RESEND_API_KEY not set' });
+  const apiKey = props.getProperty('RESEND_API_KEY');
+  if (!apiKey) return jsonResponse({ success: false, error: 'RESEND_API_KEY not set' });
+
+  const audienceId = props.getProperty('RESEND_AUDIENCE_ID');
+  if (!audienceId) {
+    return jsonResponse({ success: false, error: 'Resend audience not initialized. Run syncFullAudienceToResend() from the Apps Script editor once to set it up.' });
   }
 
   const subject = String(data.subject || '').trim();
@@ -277,38 +286,164 @@ function handleSendNewsletter(data) {
   if (!subject || !rawHtml) return jsonResponse({ success: false, error: 'Subject and body required' });
   const html = prepareNewsletterHtml(rawHtml);
 
+  const fromEmail = props.getProperty('FROM_EMAIL') || 'ben@bepickleballer.com';
+  const fromName = props.getProperty('FROM_NAME') || 'BePickleballer';
+  const fromAddr = fromName + ' <' + fromEmail + '>';
+
+  const broadcast = createResendBroadcast(apiKey, audienceId, fromAddr, subject, html);
+  if (!broadcast.success) return jsonResponse({ success: false, error: broadcast.error });
+
+  const sendResult = triggerResendBroadcast(apiKey, broadcast.id);
+  if (!sendResult.success) return jsonResponse({ success: false, error: sendResult.error });
+
+  CacheService.getScriptCache().put('last_broadcast_id', broadcast.id, 86400);
+
+  return jsonResponse({
+    success: true,
+    broadcast_id: broadcast.id,
+    message: 'Broadcast queued with Resend. Delivery to all subscribers usually completes within 1-2 minutes.'
+  });
+}
+
+function createResendBroadcast(apiKey, audienceId, fromAddr, subject, html) {
+  try {
+    const resp = UrlFetchApp.fetch('https://api.resend.com/broadcasts', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+      payload: JSON.stringify({
+        audience_id: audienceId,
+        from: fromAddr,
+        subject: subject,
+        html: html
+      }),
+      muteHttpExceptions: true
+    });
+    const code = resp.getResponseCode();
+    const body = resp.getContentText();
+    if (code < 200 || code >= 300) {
+      return { success: false, error: 'Create broadcast failed (' + code + '): ' + body };
+    }
+    return { success: true, id: JSON.parse(body).id };
+  } catch (err) {
+    return { success: false, error: 'Create broadcast error: ' + err };
+  }
+}
+
+function triggerResendBroadcast(apiKey, broadcastId) {
+  try {
+    const resp = UrlFetchApp.fetch('https://api.resend.com/broadcasts/' + broadcastId + '/send', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+      payload: JSON.stringify({}),
+      muteHttpExceptions: true
+    });
+    const code = resp.getResponseCode();
+    if (code < 200 || code >= 300) {
+      return { success: false, error: 'Send broadcast failed (' + code + '): ' + resp.getContentText() };
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: 'Send broadcast error: ' + err };
+  }
+}
+
+function addContactToResendAudience(email) {
+  const props = PropertiesService.getScriptProperties();
+  const apiKey = props.getProperty('RESEND_API_KEY');
+  const audienceId = props.getProperty('RESEND_AUDIENCE_ID');
+  if (!apiKey || !audienceId) return;
+  try {
+    UrlFetchApp.fetch('https://api.resend.com/audiences/' + audienceId + '/contacts', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+      payload: JSON.stringify({ email: email, unsubscribed: false }),
+      muteHttpExceptions: true
+    });
+  } catch (err) {}
+}
+
+function removeContactFromResendAudience(email) {
+  const props = PropertiesService.getScriptProperties();
+  const apiKey = props.getProperty('RESEND_API_KEY');
+  const audienceId = props.getProperty('RESEND_AUDIENCE_ID');
+  if (!apiKey || !audienceId) return;
+  try {
+    UrlFetchApp.fetch('https://api.resend.com/audiences/' + audienceId + '/contacts/' + encodeURIComponent(email), {
+      method: 'delete',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+      muteHttpExceptions: true
+    });
+  } catch (err) {}
+}
+
+function syncFullAudienceToResend() {
+  const props = PropertiesService.getScriptProperties();
+  const apiKey = props.getProperty('RESEND_API_KEY');
+  if (!apiKey) { Logger.log('RESEND_API_KEY not set'); return; }
+
+  let audienceId = props.getProperty('RESEND_AUDIENCE_ID');
+  if (!audienceId) {
+    try {
+      const r = UrlFetchApp.fetch('https://api.resend.com/audiences', {
+        method: 'post',
+        contentType: 'application/json',
+        headers: { 'Authorization': 'Bearer ' + apiKey },
+        payload: JSON.stringify({ name: 'BePickleballer Subscribers' }),
+        muteHttpExceptions: true
+      });
+      if (r.getResponseCode() < 300) {
+        audienceId = JSON.parse(r.getContentText()).id;
+        props.setProperty('RESEND_AUDIENCE_ID', audienceId);
+        Logger.log('Created Resend audience: ' + audienceId);
+      } else {
+        Logger.log('Audience create failed: ' + r.getContentText());
+        return;
+      }
+    } catch (err) {
+      Logger.log('Audience create error: ' + err);
+      return;
+    }
+  }
+
   const sheet = getSubscribersSheet();
-  if (!sheet) return jsonResponse({ success: false, error: 'Subscribers sheet missing' });
+  if (!sheet) { Logger.log('Subscribers sheet missing'); return; }
   const values = sheet.getDataRange().getValues();
   const emails = [];
-  let skippedRows = 0;
   for (let i = 1; i < values.length; i++) {
     const e = String(values[i][1] || '').trim().toLowerCase();
     if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) emails.push(e);
-    else if (values[i][1]) skippedRows++;
   }
-  if (emails.length === 0) return jsonResponse({ success: false, error: 'No valid subscribers found' });
 
-  props.setProperty(NEWSLETTER_JOB_KEY, JSON.stringify({
-    subject: subject,
-    html: html,
-    emails: emails,
-    cursor: 0,
-    sent: 0,
-    failed: 0,
-    skippedRows: skippedRows
-  }));
-  cleanupNewsletterTriggers();
-  CacheService.getScriptCache().put('send_progress', JSON.stringify({ sent: 0, total: emails.length, failed: 0 }), 600);
-
-  processNewsletterChunk();
-
-  const reload = PropertiesService.getScriptProperties().getProperty(NEWSLETTER_JOB_KEY);
-  if (reload) {
-    const job = JSON.parse(reload);
-    return jsonResponse({ success: true, total: emails.length, sent: job.sent, failed: job.failed, skipped: skippedRows, pending: true });
+  const CHUNK = 50;
+  let added = 0;
+  let skipped = 0;
+  for (let i = 0; i < emails.length; i += CHUNK) {
+    const batch = emails.slice(i, i + CHUNK);
+    const requests = batch.map(function(email){
+      return {
+        url: 'https://api.resend.com/audiences/' + audienceId + '/contacts',
+        method: 'post',
+        contentType: 'application/json',
+        headers: { 'Authorization': 'Bearer ' + apiKey },
+        payload: JSON.stringify({ email: email, unsubscribed: false }),
+        muteHttpExceptions: true
+      };
+    });
+    try {
+      const responses = UrlFetchApp.fetchAll(requests);
+      responses.forEach(function(resp){
+        const code = resp.getResponseCode();
+        if (code >= 200 && code < 300) added++;
+        else skipped++;
+      });
+    } catch (err) {
+      skipped += batch.length;
+    }
   }
-  return jsonResponse({ success: true, total: emails.length, sent: emails.length, failed: 0, skipped: skippedRows, pending: false });
+  Logger.log('Audience sync complete. Added/updated: ' + added + ', Skipped (likely duplicates): ' + skipped);
 }
 
 function processNewsletterChunk() {
