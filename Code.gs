@@ -187,6 +187,47 @@ const NEWSLETTER_JOB_KEY = 'newsletter_job';
 const NEWSLETTER_CHUNK_SIZE = 25;
 const NEWSLETTER_MAX_RUNTIME_MS = 4 * 60 * 1000;
 
+function prepareNewsletterHtml(html) {
+  let processed = String(html || '');
+
+  processed = processed.replace(/<img\s+([^>]*?)>/gi, function(match, attrs) {
+    if (/\bstyle\s*=/.test(attrs)) {
+      return '<img ' + attrs.replace(/style\s*=\s*"([^"]*)"/i, function(_, existing){
+        return 'style="max-width:100%;height:auto;display:block;' + existing + '"';
+      }) + '>';
+    }
+    return '<img style="max-width:100%;height:auto;display:block;" ' + attrs + '>';
+  });
+
+  processed = processed.replace(/<p(\s[^>]*)?>/gi, function(_, attrs){
+    attrs = attrs || '';
+    if (/\bstyle\s*=/.test(attrs)) {
+      return '<p' + attrs.replace(/style\s*=\s*"([^"]*)"/i, function(__, existing){
+        return 'style="margin:0 0 10px 0;line-height:1.5;' + existing + '"';
+      }) + '>';
+    }
+    return '<p style="margin:0 0 10px 0;line-height:1.5;"' + attrs + '>';
+  });
+
+  processed = processed.replace(/<table(\s[^>]*)?>/gi, function(_, attrs){
+    attrs = attrs || '';
+    if (/\bstyle\s*=/.test(attrs)) {
+      return '<table' + attrs.replace(/style\s*=\s*"([^"]*)"/i, function(__, existing){
+        return 'style="max-width:100%;border-collapse:collapse;' + existing + '"';
+      }) + '>';
+    }
+    return '<table style="max-width:100%;border-collapse:collapse;"' + attrs + '>';
+  });
+
+  return ''
+    + '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+    + '<body style="margin:0;padding:16px;background:#ffffff;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#1f2937;">'
+    +   '<div style="max-width:600px;margin:0 auto;font-size:15px;line-height:1.5;">'
+    +     processed
+    +   '</div>'
+    + '</body></html>';
+}
+
 function handleSendNewsletter(data) {
   requireAuth(data);
   const props = PropertiesService.getScriptProperties();
@@ -195,8 +236,9 @@ function handleSendNewsletter(data) {
   }
 
   const subject = String(data.subject || '').trim();
-  const html = String(data.html || '');
-  if (!subject || !html) return jsonResponse({ success: false, error: 'Subject and body required' });
+  const rawHtml = String(data.html || '');
+  if (!subject || !rawHtml) return jsonResponse({ success: false, error: 'Subject and body required' });
+  const html = prepareNewsletterHtml(rawHtml);
 
   const sheet = getSubscribersSheet();
   if (!sheet) return jsonResponse({ success: false, error: 'Subscribers sheet missing' });
