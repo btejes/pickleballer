@@ -183,14 +183,16 @@ function handleImportCsv(data) {
   return jsonResponse({ success: true, imported: imported, skipped: skipped });
 }
 
+const NEWSLETTER_JOB_KEY = 'newsletter_job';
+const NEWSLETTER_CHUNK_SIZE = 25;
+const NEWSLETTER_MAX_RUNTIME_MS = 4 * 60 * 1000;
+
 function handleSendNewsletter(data) {
   requireAuth(data);
   const props = PropertiesService.getScriptProperties();
-  const apiKey = props.getProperty('RESEND_API_KEY');
-  if (!apiKey) return jsonResponse({ success: false, error: 'RESEND_API_KEY not set' });
-  const fromEmail = props.getProperty('FROM_EMAIL') || 'ben@bepickleballer.com';
-  const fromName = props.getProperty('FROM_NAME') || 'BePickleballer';
-  const fromAddr = fromName + ' <' + fromEmail + '>';
+  if (!props.getProperty('RESEND_API_KEY')) {
+    return jsonResponse({ success: false, error: 'RESEND_API_KEY not set' });
+  }
 
   const subject = String(data.subject || '').trim();
   const html = String(data.html || '');
@@ -200,26 +202,67 @@ function handleSendNewsletter(data) {
   if (!sheet) return jsonResponse({ success: false, error: 'Subscribers sheet missing' });
   const values = sheet.getDataRange().getValues();
   const emails = [];
+  let skippedRows = 0;
   for (let i = 1; i < values.length; i++) {
     const e = String(values[i][1] || '').trim().toLowerCase();
     if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) emails.push(e);
+    else if (values[i][1]) skippedRows++;
+  }
+  if (emails.length === 0) return jsonResponse({ success: false, error: 'No valid subscribers found' });
+
+  props.setProperty(NEWSLETTER_JOB_KEY, JSON.stringify({
+    subject: subject,
+    html: html,
+    emails: emails,
+    cursor: 0,
+    sent: 0,
+    failed: 0,
+    skippedRows: skippedRows
+  }));
+  cleanupNewsletterTriggers();
+  CacheService.getScriptCache().put('send_progress', JSON.stringify({ sent: 0, total: emails.length, failed: 0 }), 600);
+
+  processNewsletterChunk();
+
+  const reload = PropertiesService.getScriptProperties().getProperty(NEWSLETTER_JOB_KEY);
+  if (reload) {
+    const job = JSON.parse(reload);
+    return jsonResponse({ success: true, total: emails.length, sent: job.sent, failed: job.failed, skipped: skippedRows, pending: true });
+  }
+  return jsonResponse({ success: true, total: emails.length, sent: emails.length, failed: 0, skipped: skippedRows, pending: false });
+}
+
+function processNewsletterChunk() {
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty(NEWSLETTER_JOB_KEY);
+  if (!raw) { cleanupNewsletterTriggers(); return; }
+
+  let job;
+  try { job = JSON.parse(raw); } catch (err) { props.deleteProperty(NEWSLETTER_JOB_KEY); cleanupNewsletterTriggers(); return; }
+
+  if (job.cursor >= job.emails.length) {
+    props.deleteProperty(NEWSLETTER_JOB_KEY);
+    cleanupNewsletterTriggers();
+    return;
   }
 
-  const CHUNK_SIZE = 50;
-  let sent = 0;
-  let failed = 0;
+  const apiKey = props.getProperty('RESEND_API_KEY');
+  const fromEmail = props.getProperty('FROM_EMAIL') || 'ben@bepickleballer.com';
+  const fromName = props.getProperty('FROM_NAME') || 'BePickleballer';
+  const fromAddr = fromName + ' <' + fromEmail + '>';
   const cache = CacheService.getScriptCache();
-  cache.put('send_progress', JSON.stringify({ sent: 0, total: emails.length, failed: 0 }), 600);
+  const startTime = Date.now();
 
-  for (let i = 0; i < emails.length; i += CHUNK_SIZE) {
-    const chunk = emails.slice(i, i + CHUNK_SIZE);
+  while (job.cursor < job.emails.length && (Date.now() - startTime) < NEWSLETTER_MAX_RUNTIME_MS) {
+    const end = Math.min(job.cursor + NEWSLETTER_CHUNK_SIZE, job.emails.length);
+    const chunk = job.emails.slice(job.cursor, end);
     const requests = chunk.map(function(to){
       return {
         url: 'https://api.resend.com/emails',
         method: 'post',
         contentType: 'application/json',
         headers: { 'Authorization': 'Bearer ' + apiKey },
-        payload: JSON.stringify({ from: fromAddr, to: [to], subject: subject, html: html }),
+        payload: JSON.stringify({ from: fromAddr, to: [to], subject: job.subject, html: job.html }),
         muteHttpExceptions: true
       };
     });
@@ -227,15 +270,42 @@ function handleSendNewsletter(data) {
       const responses = UrlFetchApp.fetchAll(requests);
       responses.forEach(function(resp){
         const code = resp.getResponseCode();
-        if (code >= 200 && code < 300) sent++; else failed++;
+        if (code >= 200 && code < 300) job.sent++; else job.failed++;
       });
     } catch (err) {
-      failed += chunk.length;
+      job.failed += chunk.length;
     }
-    cache.put('send_progress', JSON.stringify({ sent: sent, total: emails.length, failed: failed }), 600);
+    job.cursor = end;
+    props.setProperty(NEWSLETTER_JOB_KEY, JSON.stringify(job));
+    cache.put('send_progress', JSON.stringify({ sent: job.sent, total: job.emails.length, failed: job.failed }), 600);
   }
 
-  return jsonResponse({ success: true, sent: sent, total: emails.length, failed: failed });
+  if (job.cursor < job.emails.length) {
+    ScriptApp.newTrigger('processNewsletterChunk').timeBased().after(60 * 1000).create();
+  } else {
+    props.deleteProperty(NEWSLETTER_JOB_KEY);
+    cleanupNewsletterTriggers();
+  }
+}
+
+function cleanupNewsletterTriggers() {
+  const triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function(t){
+    if (t.getHandlerFunction() === 'processNewsletterChunk') {
+      try { ScriptApp.deleteTrigger(t); } catch (err) {}
+    }
+  });
+}
+
+function resumeNewsletterFromIndex(startIndex) {
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty(NEWSLETTER_JOB_KEY);
+  if (!raw) { Logger.log('No newsletter job to resume'); return; }
+  const job = JSON.parse(raw);
+  job.cursor = Math.max(0, Math.min(parseInt(startIndex, 10) || 0, job.emails.length));
+  props.setProperty(NEWSLETTER_JOB_KEY, JSON.stringify(job));
+  cleanupNewsletterTriggers();
+  processNewsletterChunk();
 }
 
 function handleSendStatus(data) {
