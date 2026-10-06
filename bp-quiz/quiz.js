@@ -1,7 +1,19 @@
 import { BP_QUESTIONS } from './questions.js';
 import { api, loadState, saveState, clearState, getResultIdFromUrl, setResultIdInUrl } from './app.js';
+import {
+  initAnalytics,
+  trackQuizStarted,
+  trackQuestionViewed,
+  trackQuizSubmitted,
+  trackEmailGateViewed,
+  trackEmailGiven,
+  trackEmailSkipped,
+  trackResultsViewed,
+  trackPaddleClicked,
+} from './analytics.js';
 
 (function(){
+  initAnalytics();
   let QUESTIONS = BP_QUESTIONS.slice();
   let state = loadState();
 
@@ -51,6 +63,9 @@ import { api, loadState, saveState, clearState, getResultIdFromUrl, setResultIdI
       if (resultId) {
         loadResultById(resultId);
       } else {
+        // Not counted when somebody opens a shared result link, which is
+        // not a quiz being started and would inflate the top of the funnel.
+        trackQuizStarted(QUESTIONS.length);
         loadingEl.classList.add('hidden');
         qSlot.classList.remove('hidden');
         renderQuestion();
@@ -79,12 +94,21 @@ import { api, loadState, saveState, clearState, getResultIdFromUrl, setResultIdI
     });
   }
 
+  // Only the first arrival at a question counts. renderQuestion also
+  // runs on every answer click, so counting those turns one person
+  // changing their mind into several views of the same question.
+  const viewedQuestions = {};
+
   function renderQuestion() {
     if (state.currentIndex >= QUESTIONS.length) {
       submit();
       return;
     }
     let q = QUESTIONS[state.currentIndex];
+    if (!viewedQuestions[q.id]) {
+      viewedQuestions[q.id] = true;
+      trackQuestionViewed(q.id, state.currentIndex, QUESTIONS.length);
+    }
     let pct = Math.round(((state.currentIndex) / QUESTIONS.length) * 100);
     progressBar.style.width = pct + '%';
     progressLabel.textContent = pct + '% Complete';
@@ -419,6 +443,7 @@ import { api, loadState, saveState, clearState, getResultIdFromUrl, setResultIdI
         return;
       }
       clearState();
+      trackQuizSubmitted(r.id);
       if (r.id) setResultIdInUrl(r.id);
       showEmailGate(r);
     }).catch(function(err){
@@ -428,6 +453,10 @@ import { api, loadState, saveState, clearState, getResultIdFromUrl, setResultIdI
   }
 
   function showEmailGate(r) {
+    // Its own step on purpose. It sits between finishing the quiz and
+    // seeing anything, so it is the one place somebody can do all the
+    // work and still leave with nothing.
+    trackEmailGateViewed(r && r.id);
     rSlot.innerHTML = '';
     const card = document.createElement('div');
     card.className = 'bp-email-gate';
@@ -462,6 +491,7 @@ import { api, loadState, saveState, clearState, getResultIdFromUrl, setResultIdI
       }
       submitBtn.disabled = true;
       submitBtn.textContent = 'Saving...';
+      trackEmailGiven(r && r.id);
       api('attach_email', { id: r.id, email: email }).then(function(){
         showResultsWithEmail(true);
       }).catch(function(){
@@ -477,6 +507,10 @@ import { api, loadState, saveState, clearState, getResultIdFromUrl, setResultIdI
     });
 
     skipBtn.addEventListener('click', function(){
+      // Kept apart from giving one. Skipping is a choice somebody made
+      // at the gate; never reaching the gate is a different loss with a
+      // different fix.
+      trackEmailSkipped(r && r.id);
       showResultsWithEmail(false);
     });
 
@@ -484,6 +518,7 @@ import { api, loadState, saveState, clearState, getResultIdFromUrl, setResultIdI
   }
 
   function renderResults(r) {
+    trackResultsViewed(r && r.id, (r && r.paddles && r.paddles.length) || 0);
     rSlot.innerHTML = '';
     let doc = document.createElement('div');
     doc.className = 'bp-results-doc';
@@ -669,6 +704,7 @@ import { api, loadState, saveState, clearState, getResultIdFromUrl, setResultIdI
         let paddleId = a.getAttribute('data-paddle-id') || '';
         let paddleName = a.getAttribute('data-paddle-name') || '';
         let completionId = (r && r.id) || getResultIdFromUrl() || '';
+        trackPaddleClicked(completionId, paddleId, paddleName);
         api('track_click', {
           completion_id: completionId,
           paddle_id: paddleId,
@@ -744,8 +780,9 @@ import { api, loadState, saveState, clearState, getResultIdFromUrl, setResultIdI
     });
   }
 
-  document.addEventListener('DOMContentLoaded', start);
-  if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    setTimeout(start, 0);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
   }
 })();
