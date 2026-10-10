@@ -11,10 +11,16 @@ import {
   trackResultsViewed,
   trackPaddleClicked,
 } from './analytics.js';
+import { applyExplanations } from './explain.js';
 
 (function(){
   initAnalytics();
   let QUESTIONS = BP_QUESTIONS.slice();
+  // The full list after the admin's overrides, kept so the level filter
+  // can be recalculated rather than applied on top of itself. Filtering
+  // the live list destructively meant somebody who picked beginner and
+  // then corrected it to advanced never got the harder questions back.
+  let baseQuestions = QUESTIONS.slice();
   let state = loadState();
 
   let loadingEl = document.getElementById('bp-loading');
@@ -40,6 +46,7 @@ import {
     QUESTIONS.forEach(function(q){
       const o = overrides[q.id];
       if (o) {
+        if (o.levels && o.levels.length) questionLevels[q.id] = o.levels;
         if (o.text) q.title = o.text;
         if (o.helper) q.helper = o.helper;
       }
@@ -59,6 +66,10 @@ import {
     api('list_question_overrides').then(function(r){
       if (r && r.success) applyOverrides(r.overrides);
     }).catch(function(){}).then(function(){
+      baseQuestions = QUESTIONS.slice();
+      // Covers somebody resuming a saved run who has already answered
+      // the skill question.
+      applyLevelFilter();
       let resultId = getResultIdFromUrl();
       if (resultId) {
         loadResultById(resultId);
@@ -98,6 +109,48 @@ import {
   // runs on every answer click, so counting those turns one person
   // changing their mind into several views of the same question.
   const viewedQuestions = {};
+
+  // Which questions a player sees, set per question in the admin.
+  // A beginner should not be asked whether they prefer dinking to
+  // dropping: they will not know the words, and a guessed answer is
+  // worse for the recommendation than no answer at all.
+  let questionLevels = {};
+
+  // Their answer to the skill question decides it. Not sure counts as
+  // beginner on purpose: the cost of confusing somebody is higher than
+  // the cost of asking a confident player fewer questions.
+  const LEVEL_BY_ANSWER = {
+    q5_beginner: 'beginner',
+    q5_30: 'intermediate',
+    q5_35: 'intermediate',
+    q5_40: 'advanced',
+    q5_45: 'expert',
+    q5_unsure: 'beginner'
+  };
+
+  function playerLevel() {
+    return LEVEL_BY_ANSWER[state.answers.q5] || null;
+  }
+
+  // Only ever drops questions after the one being answered, so the
+  // index the quiz is sitting on stays pointing at the same question.
+  function applyLevelFilter() {
+    const level = playerLevel();
+    if (!level) return;
+
+    // Nothing up to and including the skill question is ever removed,
+    // so the question being answered keeps its position and the index
+    // the quiz is sitting on stays valid.
+    let cutoff = -1;
+    baseQuestions.forEach(function(q, idx){ if (q.id === 'q5') cutoff = idx; });
+
+    QUESTIONS = baseQuestions.filter(function(q, idx){
+      if (idx <= cutoff) return true;
+      const levels = questionLevels[q.id];
+      if (!levels || !levels.length) return true;
+      return levels.indexOf(level) !== -1;
+    });
+  }
 
   function renderQuestion() {
     if (state.currentIndex >= QUESTIONS.length) {
@@ -194,6 +247,9 @@ import {
   function setAnswer(qid, value) {
     state.answers[qid] = value;
     persist();
+    // Changing the skill answer, including on the way back through,
+    // re-decides which of the later questions still apply.
+    if (qid === 'q5') applyLevelFilter();
     let nextBtn = document.getElementById('bp-next-btn');
     if (nextBtn) {
       let q = QUESTIONS.find(function(x){ return x.id === qid; });
@@ -425,6 +481,32 @@ import {
     container.appendChild(box);
   }
 
+  function buildQuizContext() {
+    let out = [];
+    QUESTIONS.forEach(function(q){
+      let a = state.answers[q.id];
+      let text = null;
+
+      if (q.type === 'slider') {
+        if (typeof a === 'number') text = a + ' out of 10';
+      } else if (Array.isArray(a)) {
+        let labels = a.map(function(id){
+          let found = (q.answers || []).find(function(x){ return x.id === id; });
+          return found ? found.label : id;
+        });
+        if (labels.length) text = labels.join(', ');
+      } else if (a) {
+        let found = (q.answers || []).find(function(x){ return x.id === a; });
+        text = found ? found.label : a;
+        // The search answer is only meaningful with what they typed.
+        if (a === 'q1_search' && state.currentPaddleName) text = state.currentPaddleName;
+      }
+
+      if (text) out.push({ q: q.title, a: text });
+    });
+    return out;
+  }
+
   function submit() {
     qSlot.classList.add('hidden');
     rSlot.classList.remove('hidden');
@@ -434,6 +516,11 @@ import {
 
     api('submit_quiz', {
       answers: state.answers,
+      // What they actually said, in words. The ids alone are not enough
+      // to explain a recommendation back to them.
+      context: buildQuizContext(),
+      // Captured on the first question and, until now, thrown away.
+      currentPaddle: state.currentPaddleName || '',
       userAgent: navigator.userAgent,
       referrer: document.referrer || ''
     }).then(function(r){
@@ -600,9 +687,15 @@ import {
               '<span>Use code <strong>' + p.discount_code + '</strong>' + discountSuffix + '</span>' +
             '</div>'
           : '';
-        let reason = p.description
-          ? '<div class="bp-paddle-reason">' + escapeHtml(p.description) + '</div>'
-          : '<div class="bp-paddle-reason">Strong match for your playing style based on your answers.</div>';
+        let reasonText = p.description || 'Strong match for your playing style based on your answers.';
+        let reason = '<div class="bp-paddle-reason">' + linkify(reasonText) + '</div>' +
+          // Empty and hidden until the explanation arrives. Results never
+          // wait on it, and a card with no explanation looks like a card
+          // that never had one rather than a broken one.
+          '<div class="bp-paddle-why" data-reason-for="' + escapeHtml(p.id) + '" hidden>' +
+            '<div class="bp-paddle-why-label">Why this one for you</div>' +
+            '<div class="bp-paddle-why-text"></div>' +
+          '</div>';
 
         let imgTag = p.image_url
           ? '<img src="' + escapeHtml(p.image_url) + '" alt="" class="bp-paddle-img" onerror="this.style.background=\'#f1f5f9\';this.removeAttribute(\'src\')">'
@@ -697,6 +790,8 @@ import {
 
     rSlot.appendChild(doc);
 
+    applyExplanations(r.id || getResultIdFromUrl(), rSlot);
+
     if (!rSlot._bpClickWired) {
       rSlot.addEventListener('click', function(e){
         let a = e.target.closest && e.target.closest('a.bp-view-btn');
@@ -773,6 +868,15 @@ import {
     return '<div class="bp-compare"><div class="bp-compare-title">How it compares to your play style</div><div class="bp-compare-grid">' + cols + '</div></div>';
   }
 
+
+  // Ben writes the paddle descriptions and drops the full review link
+  // in as plain text. Escaped first, then only the links are turned
+  // back into markup, so nothing in a description can inject HTML.
+  function linkify(s) {
+    return escapeHtml(s).replace(/https?:\/\/[^\s<]+/g, function (url) {
+      return '<a href="' + url + '" target="_blank" rel="noopener" class="bp-reason-link">' + url + '</a>';
+    });
+  }
 
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){

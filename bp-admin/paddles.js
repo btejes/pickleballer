@@ -15,6 +15,7 @@ const deleteBtn = document.getElementById('bp-paddle-delete-btn');
 
 const idInput = document.getElementById('bp-paddle-id');
 const nameInput = document.getElementById('bp-paddle-name');
+const brandInput = document.getElementById('bp-paddle-brand');
 const imageInput = document.getElementById('bp-paddle-image');
 const urlInput = document.getElementById('bp-paddle-url');
 const codeInput = document.getElementById('bp-paddle-code');
@@ -154,6 +155,7 @@ function openModal(paddle) {
   amountInput.value = isEdit ? (paddle.discount_amount || '') : '';
   priceInput.value = isEdit ? (paddle.price || '') : '';
   msrpInput.value = isEdit ? (paddle.msrp || '') : '';
+  brandInput.value = isEdit ? (paddle.brand || '') : '';
   powerInput.value = isEdit ? (paddle.power_score || '') : '';
   controlInput.value = isEdit ? (paddle.control_score || '') : '';
   spinInput.value = isEdit ? (paddle.spin_score || '') : '';
@@ -178,6 +180,7 @@ function collectFormData() {
     discount_amount: Number(amountInput.value) || 0,
     price: Number(priceInput.value) || 0,
     msrp: Number(msrpInput.value) || 0,
+    brand: brandInput.value.trim(),
     power_score: Number(powerInput.value) || 0,
     control_score: Number(controlInput.value) || 0,
     spin_score: Number(spinInput.value) || 0,

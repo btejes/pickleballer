@@ -4,7 +4,7 @@ function setupPaddleSheets() {
   let paddles = ss.getSheetByName('Paddles');
   if (!paddles) {
     paddles = ss.insertSheet('Paddles');
-    let paddleHeaders = ['id','name','image_url','affiliate_url','discount_code','discount_percent','price','msrp','power_score','control_score','spin_score','skill_tiers','categories','description','active','created_at','updated_at','discount_amount'];
+    let paddleHeaders = ['id','name','image_url','affiliate_url','discount_code','discount_percent','price','msrp','power_score','control_score','spin_score','skill_tiers','categories','description','active','created_at','updated_at','discount_amount','brand'];
     paddles.getRange(1, 1, 1, paddleHeaders.length).setValues([paddleHeaders]);
     paddles.getRange(1, 1, 1, paddleHeaders.length).setFontWeight('bold').setBackground('#f1f5f9');
     paddles.setFrozenRows(1);
@@ -60,8 +60,35 @@ function paddleRowToObject(row) {
     active: row[14] === true || String(row[14]).toUpperCase() === 'TRUE',
     created_at: row[15],
     updated_at: row[16],
-    discount_amount: Number(row[17]) || 0
+    discount_amount: Number(row[17]) || 0,
+    brand: String(row[18] || '').trim()
   };
+}
+
+// Which company makes it, used to keep one brand from filling the whole
+// top three. The column is the truth when somebody has filled it in.
+// Until then it is read off the name, which works because paddles are
+// named "<brand> <model>", with the two word brands listed because a
+// first word rule turns Six Zero into Six.
+var MULTI_WORD_BRANDS = [
+  'Six Zero', 'Pro Kennex', 'ProKennex', 'Gearbox Sports', 'Eleven Pickleball',
+  'Eleven Sports', 'Eleven', 'Eleven Athletics', 'Body Helix', 'Eleven Pickle',
+  'Wilson Sporting', 'Head Penn', 'Franklin Sports', 'Paddletek Tempest',
+  'Engage Pickleball', 'Eleven Pro', 'Vatic Pro', 'Eleven One'
+];
+
+function paddleBrand(paddle) {
+  var explicit = String((paddle && paddle.brand) || '').trim();
+  if (explicit) return explicit;
+
+  var name = String((paddle && paddle.name) || '').trim();
+  if (!name) return '';
+
+  for (var i = 0; i < MULTI_WORD_BRANDS.length; i++) {
+    var b = MULTI_WORD_BRANDS[i];
+    if (name.toLowerCase().indexOf(b.toLowerCase() + ' ') === 0) return b;
+  }
+  return name.split(/\s+/)[0];
 }
 
 function paddlePayloadToRow(id, data, createdAt) {
@@ -83,7 +110,8 @@ function paddlePayloadToRow(id, data, createdAt) {
     data.active === false ? 'FALSE' : 'TRUE',
     createdAt,
     new Date(),
-    Number(data.discount_amount) || 0
+    Number(data.discount_amount) || 0,
+    String(data.brand || '')
   ];
 }
 
