@@ -624,9 +624,10 @@ import { applyExplanations } from './explain.js';
         '<div class="bp-profile-avatar"><svg class="w-8 h-8 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg></div>' +
         '<div>' +
           '<div class="bp-profile-title">Your Playing Style Profile</div>' +
-          '<div class="bp-profile-desc">' + buildStyleDescription(profile) + '</div>' +
+          '<div class="bp-profile-desc" data-profile-summary>' + buildStyleDescription(profile) + '</div>' +
         '</div>' +
       '</div>' +
+      '<div class="bp-profile-bullets" data-profile-bullets hidden></div>' +
       '<div class="bp-profile-bars">' +
         ['Control','Power','Spin'].map(function(d){
           let v = profile[d] || 0;
@@ -687,13 +688,16 @@ import { applyExplanations } from './explain.js';
               '<span>Use code <strong>' + p.discount_code + '</strong>' + discountSuffix + '</span>' +
             '</div>'
           : '';
+        // Shown only until the explanation arrives. Ben asked for the
+        // description to go, and normally it does, but a card has to say
+        // something if the call fails.
         let reasonText = p.description || 'Strong match for your playing style based on your answers.';
         let reason = '<div class="bp-paddle-reason">' + linkify(reasonText) + '</div>' +
           // Empty and hidden until the explanation arrives. Results never
           // wait on it, and a card with no explanation looks like a card
           // that never had one rather than a broken one.
           '<div class="bp-paddle-why" data-reason-for="' + escapeHtml(p.id) + '" hidden>' +
-            '<div class="bp-paddle-why-label">Why this one for you</div>' +
+            '<div class="bp-paddle-why-label">Why this paddle fits your playing style</div>' +
             '<div class="bp-paddle-why-text"></div>' +
           '</div>';
 

@@ -819,18 +819,20 @@ function handleTrackClick(data) {
 
 // --- Why this paddle was picked for this person ---
 //
-// Ben asked for AI to explain why a paddle was picked. The first build
-// explained what each paddle is good at, which is a different question
-// and one the paddle description already answered. This one works from
-// what the matcher actually did: it filtered on budget and skill level,
-// then ranked by how many of the things their answers asked for each
-// paddle offers.
+// Two pieces, from Ben's spec: a short read of how they play, and per
+// paddle bullets that quote something they said and then say what the
+// paddle does about it. Both come from one call, so the summary and the
+// bullets cannot disagree with each other.
+//
+// The paddle's own description is no longer shown on the card. Ben's
+// reviews are good, but they are written once for everybody and say
+// nothing about the person reading them.
 //
 // Runs here rather than in the browser because the quiz is a static
 // page on GitHub Pages. A key shipped to the browser is a key anyone
 // can read and spend.
 
-const EXPLAIN_MODEL = 'gpt-4o-mini';
+const EXPLAIN_MODEL = 'gpt-4.1-mini';
 const EXPLAIN_COL = 12;         // 'explanations' on the Completions sheet, 1 based
 const CONTEXT_COL = 13;         // the quiz as words, sent by the browser
 const CURRENT_PADDLE_COL = 14;  // what they already play with
@@ -839,10 +841,9 @@ function getOpenAiKey() {
   return PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY') || '';
 }
 
-// Everything their answers asked for that is not power, control or spin.
-// Those three are sliders that scale scores, while these are the named
-// things a paddle either offers or does not, so they are what makes one
-// recommendation different from another.
+// Everything their answers asked for that is not power, control or
+// spin. Those three are sliders that scale scores, while these are the
+// named things a paddle either offers or does not.
 function wantedCategories(answers) {
   var mappings = loadMappings();
   var wanted = {};
@@ -883,17 +884,14 @@ function explainFacts(profile, paddles, ctx) {
   var paid = prices.filter(function (v) { return v > 0; });
   var cheapest = paid.length ? prices.indexOf(Math.min.apply(null, paid)) : -1;
 
-  var wanted = (ctx.wantedCategories || []).map(function (c) { return String(c).toLowerCase(); });
-
   var lines = paddles.map(function (p, i) {
     var notes = [];
 
-    // The real reason it ranked where it did.
     var has = (p.categories || []).map(function (c) { return String(c).toLowerCase(); });
     var matched = (ctx.wantedCategories || []).filter(function (c) {
       return has.indexOf(String(c).toLowerCase()) !== -1;
     });
-    if (matched.length) notes.push('matches what they asked for: ' + matched.join(', '));
+    if (matched.length) notes.push('offers what they asked for: ' + matched.join(', '));
 
     var standout = cats
       .filter(function (c) { return leaders[c.key].length === 1 && leaders[c.key][0] === i; })
@@ -908,9 +906,6 @@ function explainFacts(profile, paddles, ctx) {
 
   var known = [];
   if (ctx.filtersRelaxed) {
-    // Saying a paddle fits their budget when the filter was dropped
-    // would be a straight lie, and it is the one claim here somebody
-    // can check against the price on the card.
     known.push('- Nothing in the range fitted their budget and level, so these are the ' +
       'closest from the whole catalogue. Do not claim they fit a budget or a level.');
   } else {
@@ -918,25 +913,12 @@ function explainFacts(profile, paddles, ctx) {
     if (ctx.duprMax && ctx.duprMax < 7) known.push('- Level: DUPR ' + ctx.duprMin + ' to ' + ctx.duprMax + ', and all three suit it.');
   }
 
-  if (ctx.currentPaddle) {
-    known.push('- They currently play with: ' + ctx.currentPaddle + '.');
-  }
+  known.push('- They rated, out of 10: control ' + profile.Control +
+    ', power ' + profile.Power + ', spin ' + profile.Spin + '.');
 
-  var vals = [Number(profile.Power) || 0, Number(profile.Control) || 0, Number(profile.Spin) || 0];
-  var spread = Math.max.apply(null, vals) - Math.min.apply(null, vals);
-  if (spread <= 1) {
-    known.push('- They did not lean towards power, control or spin. Do not claim they wanted any one of them.');
-  } else {
-    var top = Math.max.apply(null, vals);
-    var named = [];
-    if (vals[0] === top) named.push('power');
-    if (vals[1] === top) named.push('control');
-    if (vals[2] === top) named.push('spin');
-    known.push('- They leaned towards ' + named.join(' and ') + '.');
-  }
-
-  if (wanted.length) {
-    known.push('- Their answers asked for: ' + (ctx.wantedCategories || []).join(', ') + '.');
+  if (ctx.currentPaddle) known.push('- They currently play with: ' + ctx.currentPaddle + '.');
+  if ((ctx.wantedCategories || []).length) {
+    known.push('- Their answers asked for: ' + ctx.wantedCategories.join(', ') + '.');
   }
 
   return { lines: lines, known: known.join('\n') };
@@ -944,8 +926,14 @@ function explainFacts(profile, paddles, ctx) {
 
 function buildExplainPrompt(profile, paddles, ctx) {
   var f = explainFacts(profile, paddles, ctx);
+
+  var transcript = (ctx.quizContext || [])
+    .map(function (row) { return '- ' + row.q + ' ' + row.a; })
+    .join(String.fromCharCode(10));
+  if (!transcript) transcript = '- (not recorded for this result)';
+
   var body = [
-    'Someone finished a pickleball paddle quiz. Tell them why each paddle came up for them.',
+    'Someone finished a pickleball paddle quiz. Write the two parts of their results page.',
     '',
     'What we know about them:',
     'KNOWN_LINES',
@@ -957,44 +945,86 @@ function buildExplainPrompt(profile, paddles, ctx) {
     '',
     'PADDLE_LINES',
     '',
-    'Write one sentence per paddle, speaking to them as you.',
+    'PART ONE, their playing style.',
+    'A summary of one or two sentences describing how they play, written to them as you.',
+    'Then two to four bullets, each quoting something they actually answered and what it means. For example: "You rated control and power 10/10, so you want both placement and offense." or "You mentioned that your soft game needs help, especially drops, dinks, and resets."',
     '',
-    'Each sentence says why this paddle came up for them. Lead with the reason it was picked, not with what the paddle is like in general. A sentence that would sit just as well under a different paddle is wrong.',
+    'PART TWO, exactly three bullets for each paddle. Not two, not one. They gave you plenty to work with.',
+    'Each bullet is a lead and a body. The lead is a short sentence in their words about something they told us, such as "You said your soft game needs help." The body says what this paddle does about that, naming the paddle where it reads naturally.',
+    'The bullets for a paddle must be about that paddle. If a bullet would sit just as well under a different one, it is wrong.',
     '',
-    'Where something they said explains the pick, say it back to them in their own terms rather than ours. Their words are more convincing than our category names.',
+    'The three paddles must open on different things. The first bullet of each one starts from a separate thing they told us, so no two cards begin the same way. Later bullets may revisit a topic if the paddle gives a different answer to it.',
     '',
-    'If they told us what they like or dislike about the paddle they already play with, you may answer that directly, using only what they said. Never state a fact about their current paddle that they did not tell us: they own it and will know.',
+    'Name the paddle the short way people would say out loud, such as the J2CR or the Filth, not its full catalogue title.',
     '',
-    'Only use reasons listed above. Never invent a feature, a price or a level.',
+    'Rules for everything you write.',
+    'Only use what is above. Never invent a feature, a price, a level or an answer they did not give.',
     '',
-    'Do not claim one quality causes an unrelated outcome. More control does not make the ball travel harder, and more spin does not add reach. If the honest link is not there, write about what the paddle does give them instead of inventing a chain between the two.',
+    'You may name the paddle they already play with, and repeat what they told us about it. Never describe how it feels, performs or compares to these three. They own it and will know.',
+    'Never say, in any wording, that a paddle matches, suits, aligns or fits with something they want unless the notes above say they want it. The comparison bars are printed under your text and will contradict you.',
+    'Do not claim one quality causes an unrelated outcome. More control does not make the ball travel harder.',
+    'Only the paddle marked cheapest may mention price, value or affordability.',
+    'Stay positive. Never explain why a paddle is a compromise, and never use despite, although, however, may not, or less than ideal.',
+    'Plain spoken, like a good coach, not marketing copy. Avoid elevate your game, versatile option, game strategies, dynamic style, good feedback, improved consistency.',
+    'Leads under 10 words. Bodies under 28 words. Summary under 40 words. Profile bullets under 24 words.',
     '',
-    'Only the paddle marked cheapest may mention price, value, affordability or budget. Calling a dearer paddle affordable while a cheaper one sits under it reads as a sales line.',
-    '',
-    'Never say a paddle matches, suits or aligns with something they want unless the notes above say they want it. If they leaned towards power and this paddle leads on control, do not call that a match: give the reason it was actually picked instead. The comparison bars are printed under your sentence and will contradict you.',
-    '',
-    'Every sentence stays positive. Never explain why a paddle is a compromise, and never use despite, although, however, may not, or less than ideal.',
-    '',
-    'Treat the second and third as good alternatives with a different character, not as worse versions of the first.',
-    '',
-    'Every sentence must carry at least one concrete thing: something they actually said, or the one way this paddle differs from the other two. A sentence with neither is filler, however well it reads.',
-    '',
-    'Plain spoken, like a good shop assistant, not marketing copy. Banned because they say nothing: elevate your game, versatile option, game strategies, dynamic style, good feedback, improved consistency, opportunity to explore, without a high commitment, perfect for your current skill level, suits your playing style.',
-    '',
-    'Under 24 words each. Do not repeat the paddle name and never quote a score.',
-    '',
-    'Reply as JSON only: {"1": "...", "2": "...", "3": "..."}'
+    'Reply as JSON only, exactly this shape:',
+    '{"profile": {"summary": "...", "bullets": ["...", "..."]}, "paddles": {"1": [{"lead": "...", "body": "..."}], "2": [...], "3": [...]}}'
   ].join(String.fromCharCode(10));
-
-  var transcript = (ctx.quizContext || [])
-    .map(function (row) { return '- ' + row.q + ' ' + row.a; })
-    .join(String.fromCharCode(10));
-  if (!transcript) transcript = '- (not recorded for this result)';
 
   return body
     .split('KNOWN_LINES').join(f.known)
     .split('TRANSCRIPT').join(transcript)
     .split('PADDLE_LINES').join(f.lines);
+}
+
+function askForExplanation(prompt, key) {
+  try {
+    var res = UrlFetchApp.fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + key },
+      muteHttpExceptions: true,
+      payload: JSON.stringify({
+        model: EXPLAIN_MODEL,
+        response_format: { type: 'json_object' },
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    if (res.getResponseCode() !== 200) return null;
+    var parsed = JSON.parse(JSON.parse(res.getContentText()).choices[0].message.content);
+    if (!parsed || !parsed.profile || !parsed.paddles) return null;
+    return parsed;
+  } catch (err) {
+    return null;
+  }
+}
+
+// A card with one bullet looks unfinished next to one with three, and
+// asking again is cheaper than shipping it.
+function hasEnoughBullets(parsed, count) {
+  for (var i = 1; i <= count; i++) {
+    var rows = parsed.paddles[String(i)];
+    if (!Array.isArray(rows) || rows.length < 2) return false;
+  }
+  return true;
+}
+
+// True when two cards open the same way. Only the first bullet counts:
+// that is the line somebody reads on every card as they scroll, and two
+// of them matching is what makes the page look copied. A later bullet
+// revisiting a topic is fine, because the paddle answers it differently.
+function hasRepeatedLeads(parsed, count) {
+  var seen = {};
+  for (var i = 1; i <= count; i++) {
+    var rows = parsed.paddles[String(i)];
+    if (!Array.isArray(rows) || !rows.length) continue;
+    var lead = String((rows[0] && rows[0].lead) || '').toLowerCase().trim();
+    if (!lead) continue;
+    if (seen[lead]) return true;
+    seen[lead] = true;
+  }
+  return false;
 }
 
 function handleExplainResult(data) {
@@ -1012,7 +1042,12 @@ function handleExplainResult(data) {
     // link costs nothing and reads the same as it did the first time.
     var cached = String(values[i][EXPLAIN_COL - 1] || '');
     if (cached) {
-      try { return jsonResponse({ success: true, explanations: JSON.parse(cached) }); } catch (err) {}
+      try {
+        var old = JSON.parse(cached);
+        if (old && old.profile) return jsonResponse({ success: true, explanation: old });
+        // Anything cached before this shape existed is regenerated
+        // rather than shown in a layout that can no longer render it.
+      } catch (err) {}
     }
 
     var key = getOpenAiKey();
@@ -1020,12 +1055,12 @@ function handleExplainResult(data) {
 
     var answers = {};
     try { answers = JSON.parse(values[i][6] || '{}'); } catch (err) {}
+    var quizContext = [];
+    try { quizContext = JSON.parse(values[i][CONTEXT_COL - 1] || '[]'); } catch (err) {}
+
     var result = runMatching(answers);
     var paddles = result.paddles.slice(0, 3);
     if (!paddles.length) return jsonResponse({ success: false, error: 'No paddles' });
-
-    var quizContext = [];
-    try { quizContext = JSON.parse(values[i][CONTEXT_COL - 1] || '[]'); } catch (err) {}
 
     var ctx = {
       quizContext: quizContext,
@@ -1037,48 +1072,50 @@ function handleExplainResult(data) {
       wantedCategories: wantedCategories(answers)
     };
 
-    var text = '';
-    try {
-      var res = UrlFetchApp.fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'post',
-        contentType: 'application/json',
-        headers: { Authorization: 'Bearer ' + key },
-        muteHttpExceptions: true,
-        payload: JSON.stringify({
-          model: EXPLAIN_MODEL,
-          response_format: { type: 'json_object' },
-          messages: [{ role: 'user', content: buildExplainPrompt(result.profile, paddles, ctx) }]
-        })
-      });
-      if (res.getResponseCode() !== 200) {
-        return jsonResponse({ success: false, error: 'Model call failed' });
-      }
-      text = JSON.parse(res.getContentText()).choices[0].message.content;
-    } catch (err) {
-      return jsonResponse({ success: false, error: 'Model call failed' });
-    }
+    var prompt = buildExplainPrompt(result.profile, paddles, ctx);
 
-    var parsed = {};
-    try { parsed = JSON.parse(text); } catch (err) {
-      return jsonResponse({ success: false, error: 'Bad model response' });
+    // Asked once, and once more if the three cards opened with the same
+    // sentence. The instruction not to repeat a lead holds most of the
+    // time but not all of it, and three identical openings is the thing
+    // the whole format exists to avoid. A second attempt is cheaper
+    // than shipping that.
+    var parsed = null;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      var candidate = askForExplanation(prompt, key);
+      if (!candidate) break;
+      parsed = candidate;
+      if (!hasRepeatedLeads(candidate, paddles.length) && hasEnoughBullets(candidate, paddles.length)) break;
     }
+    if (!parsed) return jsonResponse({ success: false, error: 'Model call failed' });
 
     // Keyed by paddle id, because the card knows its paddle and not its
     // position in a list the matcher could reorder.
     var byPaddle = {};
     paddles.forEach(function (p, idx) {
-      var line = parsed[String(idx + 1)];
-      if (line) byPaddle[p.id] = String(line);
+      var rows = parsed.paddles[String(idx + 1)];
+      if (Array.isArray(rows)) {
+        byPaddle[p.id] = rows
+          .filter(function (b) { return b && (b.lead || b.body); })
+          .map(function (b) { return { lead: String(b.lead || ''), body: String(b.body || '') }; });
+      }
     });
 
+    var out = {
+      profile: {
+        summary: String(parsed.profile.summary || ''),
+        bullets: (parsed.profile.bullets || []).map(function (b) { return String(b); })
+      },
+      paddles: byPaddle
+    };
+
     try {
-      sheet.getRange(i + 1, EXPLAIN_COL).setValue(JSON.stringify(byPaddle));
+      sheet.getRange(i + 1, EXPLAIN_COL).setValue(JSON.stringify(out));
     } catch (err) {
       // Not worth failing the response over. The worst case is paying
       // for this result again if somebody reopens the link.
     }
 
-    return jsonResponse({ success: true, explanations: byPaddle });
+    return jsonResponse({ success: true, explanation: out });
   }
 
   return jsonResponse({ success: false, error: 'Result not found' });
