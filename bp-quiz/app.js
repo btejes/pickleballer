@@ -1,4 +1,4 @@
-const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbz6R0VAaTHsdqXZmx87wJCLhQrwYfLVW42QGaH4FMKu-wdz50MnPdD-R6ZIE-SK6KdJ/exec';
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbxMQ6neNFESRwj9ov6X_jszniiZLM8z82DCGgNhFL91rEWY8jsGZ6miXnkpBoRLy_hT/exec';
 const STORAGE_KEY = 'bp_quiz_state_v1';
 const PARENT_ORIGIN = 'https://bepickleballer.com';
 
