@@ -29,6 +29,70 @@ function setOverride(id, patch) {
   overrides[id] = Object.assign({}, o, patch);
 }
 
+const PLAYER_LEVELS = ['beginner', 'intermediate', 'advanced', 'expert'];
+
+// Which players get asked this question. All four ticked, or none at
+// all, means everybody sees it, so an untouched question behaves
+// exactly as it did before any of this existed. The point is to stop
+// asking a beginner whether they prefer dinking to dropping, which
+// they cannot answer honestly and which then skews their result.
+function makeLevelsField(current, onChange) {
+  const wrap = document.createElement("div");
+  wrap.className = "mt-3";
+
+  const label = document.createElement("div");
+  label.className = "text-xs font-bold text-slate-500 uppercase tracking-wider mb-1";
+  label.textContent = "Ask this of";
+  wrap.appendChild(label);
+
+  const row = document.createElement("div");
+  row.className = "flex flex-wrap gap-3";
+
+  const chosen = Array.isArray(current) ? current.slice() : String(current || "")
+    .split(",").map(function(x){ return x.trim().toLowerCase(); }).filter(Boolean);
+
+  PLAYER_LEVELS.forEach(function(level){
+    const l = document.createElement("label");
+    l.className = "flex items-center gap-1.5 text-xs cursor-pointer select-none";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = "w-4 h-4";
+    cb.checked = chosen.length === 0 || chosen.indexOf(level) !== -1;
+    cb.addEventListener("change", function(){
+      const picked = [];
+      row.querySelectorAll("input[type=checkbox]").forEach(function(box, i){
+        if (box.checked) picked.push(PLAYER_LEVELS[i]);
+      });
+      // Unticking the last one would read as "nobody", but an empty
+      // list means no restriction, so it would quietly do the
+      // opposite. A question nobody should see is what the Visible
+      // toggle is for.
+      if (picked.length === 0) {
+        row.querySelectorAll("input[type=checkbox]").forEach(function(box){ box.checked = true; });
+        onChange([]);
+        return;
+      }
+      // Everyone ticked is the same as no restriction, and storing it
+      // that way keeps the sheet readable.
+      onChange(picked.length === PLAYER_LEVELS.length ? [] : picked);
+    });
+    l.appendChild(cb);
+    const span = document.createElement("span");
+    span.textContent = level;
+    l.appendChild(span);
+    row.appendChild(l);
+  });
+
+  wrap.appendChild(row);
+
+  const note = document.createElement("p");
+  note.className = "text-xs text-slate-500 mt-1";
+  note.textContent = "Untick a level to skip this question for those players. The skill question itself and everything before it is always asked.";
+  wrap.appendChild(note);
+
+  return wrap;
+}
+
 function render() {
   listEl.innerHTML = '';
   BP_QUESTIONS.forEach(function(q, idx){
@@ -62,6 +126,10 @@ function render() {
       setOverride(q.id, { text: val });
     });
     card.appendChild(titleField);
+
+    card.appendChild(makeLevelsField(o.levels, function(levels){
+      setOverride(q.id, { levels: levels });
+    }));
 
     if (q.helper !== undefined) {
       const helperField = makeField('Helper text', q.helper || '', o.helper || '', function(val){

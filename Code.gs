@@ -8,7 +8,8 @@ const PUBLIC_ACTIONS = [
   'track_click',
   'attach_email',
   'list_filters',
-  'list_question_overrides'
+  'list_question_overrides',
+  'explain_result'
 ];
 
 function doPost(e) {
@@ -35,6 +36,7 @@ function doPost(e) {
       case 'attach_email':                   return handleAttachEmail(data);
       case 'list_filters':                   return handleListFilters(data);
       case 'list_question_overrides':        return handleListQuestionOverrides(data);
+      case 'explain_result':                 return handleExplainResult(data);
 
       case 'login':                          return handleLogin(data);
       case 'list_subscribers':               return handleListSubscribers(data);

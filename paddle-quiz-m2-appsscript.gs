@@ -64,7 +64,7 @@ function setupQuizSheets() {
   let completions = ss.getSheetByName('Completions');
   if (!completions) {
     completions = ss.insertSheet('Completions');
-    let completionHeaders = ['id','created_at','email','dupr_min','dupr_max','budget_max','answers_json','top_paddles_json','playing_style','user_agent','referrer'];
+    let completionHeaders = ['id','created_at','email','dupr_min','dupr_max','budget_max','answers_json','top_paddles_json','playing_style','user_agent','referrer','explanations','quiz_context','current_paddle'];
     completions.getRange(1, 1, 1, completionHeaders.length).setValues([completionHeaders]);
     completions.getRange(1, 1, 1, completionHeaders.length).setFontWeight('bold').setBackground('#f1f5f9');
     completions.setFrozenRows(1);
@@ -92,7 +92,7 @@ function setupQuizSheets() {
   let overrides = ss.getSheetByName('QuestionOverrides');
   if (!overrides) {
     overrides = ss.insertSheet('QuestionOverrides');
-    let overrideHeaders = ['id','text','helper','hidden'];
+    let overrideHeaders = ['id','text','helper','hidden','levels'];
     overrides.getRange(1, 1, 1, overrideHeaders.length).setValues([overrideHeaders]);
     overrides.getRange(1, 1, 1, overrideHeaders.length).setFontWeight('bold').setBackground('#f1f5f9');
     overrides.setFrozenRows(1);
@@ -334,7 +334,31 @@ function runMatching(answers) {
     return String(a.name).localeCompare(String(b.name));
   });
 
-  let top = filtered.slice(0, 3).map(function(p){
+  // One paddle per brand in the top three. A brand with several strong
+  // paddles was taking every slot, which reads as a sponsored list
+  // rather than a recommendation, and gives somebody nothing to choose
+  // between.
+  let picked = [];
+  let usedBrands = {};
+  filtered.forEach(function(p){
+    if (picked.length >= 3) return;
+    let b = paddleBrand(p).toLowerCase();
+    if (b && usedBrands[b]) return;
+    if (b) usedBrands[b] = true;
+    picked.push(p);
+  });
+
+  // A thin catalogue, or one where everything is the same brand, still
+  // gets three results. Showing two would look broken to the person and
+  // costs a click we already earned.
+  if (picked.length < 3) {
+    filtered.forEach(function(p){
+      if (picked.length >= 3) return;
+      if (picked.indexOf(p) === -1) picked.push(p);
+    });
+  }
+
+  let top = picked.map(function(p){
     return {
       id: p.id,
       name: p.name,
@@ -349,6 +373,12 @@ function runMatching(answers) {
       control_score: p.control_score,
       spin_score: p.spin_score,
       description: p.description,
+      // Carried through so the explanation can say which of the
+      // things they asked for this paddle actually matched. Scoring
+      // runs on these, so without them any "why" is guesswork.
+      categories: p.categories || [],
+      skill_tiers: p.skill_tiers || [],
+      brand: paddleBrand(p),
       score: scores[p.id] || 0
     };
   });
@@ -416,7 +446,14 @@ function handleListQuestionOverrides(data) {
     overrides[id] = {
       text: String(values[i][1] || ''),
       helper: String(values[i][2] || ''),
-      hidden: values[i][3] === true || String(values[i][3]).toUpperCase() === 'TRUE'
+      hidden: values[i][3] === true || String(values[i][3]).toUpperCase() === 'TRUE',
+      // Which players see this question, comma separated, from
+      // beginner, intermediate, advanced, expert. Blank means everyone,
+      // so a sheet nobody has edited behaves exactly as it does today.
+      levels: String(values[i][4] || '')
+        .split(',')
+        .map(function (x) { return x.trim().toLowerCase(); })
+        .filter(Boolean)
     };
   }
   return jsonResponse({ success: true, overrides: overrides });
@@ -428,13 +465,13 @@ function handleSaveQuestionOverrides(data) {
   let sheet = ss.getSheetByName('QuestionOverrides');
   if (!sheet) {
     sheet = ss.insertSheet('QuestionOverrides');
-    const headers = ['id','text','helper','hidden'];
+    const headers = ['id','text','helper','hidden','levels'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#f1f5f9');
     sheet.setFrozenRows(1);
   }
   if (sheet.getLastRow() > 1) {
-    sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).clearContent();
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).clearContent();
   }
   const overrides = data.overrides || {};
   const rows = [];
@@ -443,17 +480,28 @@ function handleSaveQuestionOverrides(data) {
     const text = String(o.text || '').trim();
     const helper = String(o.helper || '').trim();
     const hidden = o.hidden === true;
-    if (!text && !helper && !hidden) return;
-    rows.push([id, text, helper, hidden ? 'TRUE' : 'FALSE']);
+    // Comma separated, from beginner, intermediate, advanced, expert.
+    // Blank means every player sees the question, which is why a row
+    // carrying only levels still has to be written.
+    const levels = Array.isArray(o.levels)
+      ? o.levels.join(',')
+      : String(o.levels || '').trim();
+    if (!text && !helper && !hidden && !levels) return;
+    rows.push([id, text, helper, hidden ? 'TRUE' : 'FALSE', levels]);
   });
   if (rows.length > 0) {
-    sheet.getRange(2, 1, rows.length, 4).setValues(rows);
+    sheet.getRange(2, 1, rows.length, 5).setValues(rows);
   }
   return jsonResponse({ success: true, rows: rows.length });
 }
 
 function handleSubmitQuiz(data) {
   let answers = data.answers || {};
+  // Sent by the browser, which is the only place the question titles and
+  // answer labels exist. Stored rather than derived so an explanation
+  // written months later still reads against the wording they saw.
+  let context = Array.isArray(data.context) ? data.context : [];
+  let currentPaddle = String(data.currentPaddle || '').trim();
   let email = String(data.email || '').trim().toLowerCase();
   let userAgent = String(data.userAgent || '');
   let referrer = String(data.referrer || '');
@@ -479,7 +527,10 @@ function handleSubmitQuiz(data) {
       JSON.stringify(paddleSummary),
       JSON.stringify(result.profile),
       userAgent,
-      referrer
+      referrer,
+      '',                        // explanations, filled on first generation
+      JSON.stringify(context),
+      currentPaddle
     ]);
   }
 
@@ -764,4 +815,308 @@ function handleTrackClick(data) {
     String(data.paddle_name || '')
   ]);
   return jsonResponse({ success: true });
+}
+
+// --- Why this paddle was picked for this person ---
+//
+// Two pieces, from Ben's spec: a short read of how they play, and per
+// paddle bullets that quote something they said and then say what the
+// paddle does about it. Both come from one call, so the summary and the
+// bullets cannot disagree with each other.
+//
+// The paddle's own description is no longer shown on the card. Ben's
+// reviews are good, but they are written once for everybody and say
+// nothing about the person reading them.
+//
+// Runs here rather than in the browser because the quiz is a static
+// page on GitHub Pages. A key shipped to the browser is a key anyone
+// can read and spend.
+
+const EXPLAIN_MODEL = 'gpt-4.1-mini';
+const EXPLAIN_COL = 12;         // 'explanations' on the Completions sheet, 1 based
+const CONTEXT_COL = 13;         // the quiz as words, sent by the browser
+const CURRENT_PADDLE_COL = 14;  // what they already play with
+
+function getOpenAiKey() {
+  return PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY') || '';
+}
+
+// Everything their answers asked for that is not power, control or
+// spin. Those three are sliders that scale scores, while these are the
+// named things a paddle either offers or does not.
+function wantedCategories(answers) {
+  var mappings = loadMappings();
+  var wanted = {};
+  Object.keys(answers || {}).forEach(function (qid) {
+    var answer = answers[qid];
+    if (typeof answer === 'number') return;
+    var ids = Array.isArray(answer) ? answer : [answer];
+    ids.forEach(function (aid) {
+      var cats = (mappings[qid] && mappings[qid][aid]) || [];
+      cats.forEach(function (cat) {
+        if (!isBaseCategory(cat)) wanted[String(cat).toLowerCase()] = String(cat);
+      });
+    });
+  });
+  return Object.keys(wanted).map(function (k) { return wanted[k]; });
+}
+
+function explainFacts(profile, paddles, ctx) {
+  var cats = [
+    { key: 'power_score', label: 'power' },
+    { key: 'control_score', label: 'control' },
+    { key: 'spin_score', label: 'spin' }
+  ];
+
+  // Raw scores are useless on their own. The sheet holds 1 to 10 while
+  // the code carries a migration to 1 to 5 that was never run, and
+  // either way a number means nothing without the other two beside it.
+  var leaders = {};
+  cats.forEach(function (c) {
+    var best = -Infinity;
+    paddles.forEach(function (p) { best = Math.max(best, Number(p[c.key]) || 0); });
+    leaders[c.key] = paddles
+      .map(function (p, i) { return (Number(p[c.key]) || 0) === best ? i : -1; })
+      .filter(function (i) { return i !== -1; });
+  });
+
+  var prices = paddles.map(function (p) { return Number(p.price) || 0; });
+  var paid = prices.filter(function (v) { return v > 0; });
+  var cheapest = paid.length ? prices.indexOf(Math.min.apply(null, paid)) : -1;
+
+  var lines = paddles.map(function (p, i) {
+    var notes = [];
+
+    var has = (p.categories || []).map(function (c) { return String(c).toLowerCase(); });
+    var matched = (ctx.wantedCategories || []).filter(function (c) {
+      return has.indexOf(String(c).toLowerCase()) !== -1;
+    });
+    if (matched.length) notes.push('offers what they asked for: ' + matched.join(', '));
+
+    var standout = cats
+      .filter(function (c) { return leaders[c.key].length === 1 && leaders[c.key][0] === i; })
+      .map(function (c) { return c.label; });
+    if (standout.length) notes.push('the most ' + standout.join(' and ') + ' of the three');
+
+    if (i === cheapest && paid.length > 1) notes.push('the cheapest of the three');
+    if (!notes.length) notes.push('the balanced one, no single standout');
+
+    return (i + 1) + '. ' + p.name + ', $' + p.price + '. ' + notes.join('. ') + '.';
+  }).join('\n');
+
+  var known = [];
+  if (ctx.filtersRelaxed) {
+    known.push('- Nothing in the range fitted their budget and level, so these are the ' +
+      'closest from the whole catalogue. Do not claim they fit a budget or a level.');
+  } else {
+    if (ctx.budgetMax && ctx.budgetMax < 9999) known.push('- Budget: up to $' + ctx.budgetMax + ', and all three are inside it.');
+    if (ctx.duprMax && ctx.duprMax < 7) known.push('- Level: DUPR ' + ctx.duprMin + ' to ' + ctx.duprMax + ', and all three suit it.');
+  }
+
+  known.push('- They rated, out of 10: control ' + profile.Control +
+    ', power ' + profile.Power + ', spin ' + profile.Spin + '.');
+
+  if (ctx.currentPaddle) known.push('- They currently play with: ' + ctx.currentPaddle + '.');
+  if ((ctx.wantedCategories || []).length) {
+    known.push('- Their answers asked for: ' + ctx.wantedCategories.join(', ') + '.');
+  }
+
+  return { lines: lines, known: known.join('\n') };
+}
+
+function buildExplainPrompt(profile, paddles, ctx) {
+  var f = explainFacts(profile, paddles, ctx);
+
+  var transcript = (ctx.quizContext || [])
+    .map(function (row) { return '- ' + row.q + ' ' + row.a; })
+    .join(String.fromCharCode(10));
+  if (!transcript) transcript = '- (not recorded for this result)';
+
+  var body = [
+    'Someone finished a pickleball paddle quiz. Write the two parts of their results page.',
+    '',
+    'What we know about them:',
+    'KNOWN_LINES',
+    '',
+    'Their answers, in their own words:',
+    'TRANSCRIPT',
+    '',
+    'Our matcher removed anything outside their budget and level, then ranked what was left by how much of what they asked for each paddle offers. These three came out on top, best first.',
+    '',
+    'PADDLE_LINES',
+    '',
+    'PART ONE, their playing style.',
+    'A summary of one or two sentences describing how they play, written to them as you.',
+    'Then two to four bullets, each quoting something they actually answered and what it means. For example: "You rated control and power 10/10, so you want both placement and offense." or "You mentioned that your soft game needs help, especially drops, dinks, and resets."',
+    '',
+    'PART TWO, exactly three bullets for each paddle. Not two, not one. They gave you plenty to work with.',
+    'Each bullet is a lead and a body. The lead is a short sentence in their words about something they told us, such as "You said your soft game needs help." The body says what this paddle does about that, naming the paddle where it reads naturally.',
+    'The bullets for a paddle must be about that paddle. If a bullet would sit just as well under a different one, it is wrong.',
+    '',
+    'The three paddles must open on different things. The first bullet of each one starts from a separate thing they told us, so no two cards begin the same way. Later bullets may revisit a topic if the paddle gives a different answer to it.',
+    '',
+    'Name the paddle the short way people would say out loud, such as the J2CR or the Filth, not its full catalogue title.',
+    '',
+    'Rules for everything you write.',
+    'Only use what is above. Never invent a feature, a price, a level or an answer they did not give.',
+    '',
+    'You may name the paddle they already play with, and repeat what they told us about it. Never describe how it feels, performs or compares to these three. They own it and will know.',
+    'Never say, in any wording, that a paddle matches, suits, aligns or fits with something they want unless the notes above say they want it. The comparison bars are printed under your text and will contradict you.',
+    'Do not claim one quality causes an unrelated outcome. More control does not make the ball travel harder.',
+    'Only the paddle marked cheapest may mention price, value or affordability.',
+    'Stay positive. Never explain why a paddle is a compromise, and never use despite, although, however, may not, or less than ideal.',
+    'Plain spoken, like a good coach, not marketing copy. Avoid elevate your game, versatile option, game strategies, dynamic style, good feedback, improved consistency.',
+    'Leads under 10 words. Bodies under 28 words. Summary under 40 words. Profile bullets under 24 words.',
+    '',
+    'Reply as JSON only, exactly this shape:',
+    '{"profile": {"summary": "...", "bullets": ["...", "..."]}, "paddles": {"1": [{"lead": "...", "body": "..."}], "2": [...], "3": [...]}}'
+  ].join(String.fromCharCode(10));
+
+  return body
+    .split('KNOWN_LINES').join(f.known)
+    .split('TRANSCRIPT').join(transcript)
+    .split('PADDLE_LINES').join(f.lines);
+}
+
+function askForExplanation(prompt, key) {
+  try {
+    var res = UrlFetchApp.fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + key },
+      muteHttpExceptions: true,
+      payload: JSON.stringify({
+        model: EXPLAIN_MODEL,
+        response_format: { type: 'json_object' },
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    if (res.getResponseCode() !== 200) return null;
+    var parsed = JSON.parse(JSON.parse(res.getContentText()).choices[0].message.content);
+    if (!parsed || !parsed.profile || !parsed.paddles) return null;
+    return parsed;
+  } catch (err) {
+    return null;
+  }
+}
+
+// A card with one bullet looks unfinished next to one with three, and
+// asking again is cheaper than shipping it.
+function hasEnoughBullets(parsed, count) {
+  for (var i = 1; i <= count; i++) {
+    var rows = parsed.paddles[String(i)];
+    if (!Array.isArray(rows) || rows.length < 2) return false;
+  }
+  return true;
+}
+
+// True when two cards open the same way. Only the first bullet counts:
+// that is the line somebody reads on every card as they scroll, and two
+// of them matching is what makes the page look copied. A later bullet
+// revisiting a topic is fine, because the paddle answers it differently.
+function hasRepeatedLeads(parsed, count) {
+  var seen = {};
+  for (var i = 1; i <= count; i++) {
+    var rows = parsed.paddles[String(i)];
+    if (!Array.isArray(rows) || !rows.length) continue;
+    var lead = String((rows[0] && rows[0].lead) || '').toLowerCase().trim();
+    if (!lead) continue;
+    if (seen[lead]) return true;
+    seen[lead] = true;
+  }
+  return false;
+}
+
+function handleExplainResult(data) {
+  var id = String(data.id || '').trim();
+  if (!id) return jsonResponse({ success: false, error: 'Missing id' });
+
+  var sheet = getCompletionsSheet();
+  if (!sheet) return jsonResponse({ success: false, error: 'Completions sheet missing' });
+
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][0]) !== id) continue;
+
+    // Written back after the first generation, so revisiting a results
+    // link costs nothing and reads the same as it did the first time.
+    var cached = String(values[i][EXPLAIN_COL - 1] || '');
+    if (cached) {
+      try {
+        var old = JSON.parse(cached);
+        if (old && old.profile) return jsonResponse({ success: true, explanation: old });
+        // Anything cached before this shape existed is regenerated
+        // rather than shown in a layout that can no longer render it.
+      } catch (err) {}
+    }
+
+    var key = getOpenAiKey();
+    if (!key) return jsonResponse({ success: false, error: 'No API key configured' });
+
+    var answers = {};
+    try { answers = JSON.parse(values[i][6] || '{}'); } catch (err) {}
+    var quizContext = [];
+    try { quizContext = JSON.parse(values[i][CONTEXT_COL - 1] || '[]'); } catch (err) {}
+
+    var result = runMatching(answers);
+    var paddles = result.paddles.slice(0, 3);
+    if (!paddles.length) return jsonResponse({ success: false, error: 'No paddles' });
+
+    var ctx = {
+      quizContext: quizContext,
+      currentPaddle: String(values[i][CURRENT_PADDLE_COL - 1] || ''),
+      budgetMax: result.budgetMax,
+      duprMin: result.duprMin,
+      duprMax: result.duprMax,
+      filtersRelaxed: result.filtersRelaxed,
+      wantedCategories: wantedCategories(answers)
+    };
+
+    var prompt = buildExplainPrompt(result.profile, paddles, ctx);
+
+    // Asked once, and once more if the three cards opened with the same
+    // sentence. The instruction not to repeat a lead holds most of the
+    // time but not all of it, and three identical openings is the thing
+    // the whole format exists to avoid. A second attempt is cheaper
+    // than shipping that.
+    var parsed = null;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      var candidate = askForExplanation(prompt, key);
+      if (!candidate) break;
+      parsed = candidate;
+      if (!hasRepeatedLeads(candidate, paddles.length) && hasEnoughBullets(candidate, paddles.length)) break;
+    }
+    if (!parsed) return jsonResponse({ success: false, error: 'Model call failed' });
+
+    // Keyed by paddle id, because the card knows its paddle and not its
+    // position in a list the matcher could reorder.
+    var byPaddle = {};
+    paddles.forEach(function (p, idx) {
+      var rows = parsed.paddles[String(idx + 1)];
+      if (Array.isArray(rows)) {
+        byPaddle[p.id] = rows
+          .filter(function (b) { return b && (b.lead || b.body); })
+          .map(function (b) { return { lead: String(b.lead || ''), body: String(b.body || '') }; });
+      }
+    });
+
+    var out = {
+      profile: {
+        summary: String(parsed.profile.summary || ''),
+        bullets: (parsed.profile.bullets || []).map(function (b) { return String(b); })
+      },
+      paddles: byPaddle
+    };
+
+    try {
+      sheet.getRange(i + 1, EXPLAIN_COL).setValue(JSON.stringify(out));
+    } catch (err) {
+      // Not worth failing the response over. The worst case is paying
+      // for this result again if somebody reopens the link.
+    }
+
+    return jsonResponse({ success: true, explanation: out });
+  }
+
+  return jsonResponse({ success: false, error: 'Result not found' });
 }
