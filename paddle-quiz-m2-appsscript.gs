@@ -205,14 +205,40 @@ function handleSaveMappings(data) {
     });
   });
 
+  // Saving replaces the sheet, and the admin only knows about single,
+  // multi and search questions: it filters sliders out of its list, so
+  // they are never in the payload. Without this, one save from the
+  // mappings page silently deletes the slider rows and the power,
+  // control and spin answers stop counting again, with nothing to say
+  // it happened.
+  //
+  // Reserved ids are the ones the admin cannot produce. There is one
+  // today, __slider__, and the prefix keeps the rule from needing a
+  // list.
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(10000);
+
+    const supplied = {};
+    rows.forEach(function (r) { supplied[r[0] + '|' + r[1]] = true; });
+
+    const existing = sheet.getDataRange().getValues();
+    const preserved = [];
+    for (let i = 1; i < existing.length; i++) {
+      const qid = String(existing[i][0] || '').trim();
+      const aid = String(existing[i][1] || '').trim();
+      if (!qid || aid.indexOf('__') !== 0) continue;
+      if (supplied[qid + '|' + aid]) continue;
+      preserved.push([qid, aid, String(existing[i][2] || '')]);
+    }
+
+    const all = rows.concat(preserved);
+
     if (sheet.getLastRow() > 1) {
       sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).clearContent();
     }
-    if (rows.length > 0) {
-      sheet.getRange(2, 1, rows.length, 3).setValues(rows);
+    if (all.length > 0) {
+      sheet.getRange(2, 1, all.length, 3).setValues(all);
     }
     SpreadsheetApp.flush();
     invalidateMappingsCache();
@@ -1005,7 +1031,7 @@ function askForExplanation(prompt, key) {
 function hasEnoughBullets(parsed, count) {
   for (var i = 1; i <= count; i++) {
     var rows = parsed.paddles[String(i)];
-    if (!Array.isArray(rows) || rows.length < 2) return false;
+    if (!Array.isArray(rows) || rows.length < 3) return false;
   }
   return true;
 }
